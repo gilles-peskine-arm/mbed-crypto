@@ -453,6 +453,9 @@ make
 msg "test: main suites (inc. selftests) (ASan build)" # ~ 50s
 make test
 
+msg "test psa_constant_names" # ~ 1s
+record_status tests/scripts/test_psa_constant_names.py
+
 msg "test: ssl-opt.sh (ASan build)" # ~ 1 min
 if_build_succeeded tests/ssl-opt.sh
 
