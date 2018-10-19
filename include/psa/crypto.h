@@ -783,7 +783,7 @@ typedef uint32_t psa_algorithm_t;
  *          algorithm is considered identical to the untruncated algorithm
  *          for policy comparison purposes.
  *
- * \param alg           A MAC algorithm identifier (value of type
+ * \param mac_alg       A MAC algorithm identifier (value of type
  *                      #psa_algorithm_t such that #PSA_ALG_IS_MAC(\p alg)
  *                      is true). This may be a truncated or untruncated
  *                      MAC algorithm.
@@ -799,14 +799,14 @@ typedef uint32_t psa_algorithm_t;
  *                      MAC algorithm or if \p mac_length is too small or
  *                      too large for the specified MAC algorithm.
  */
-#define PSA_ALG_TRUNCATED_MAC(alg, mac_length)                          \
-    (((alg) & ~PSA_ALG_MAC_TRUNCATION_MASK) |                           \
+#define PSA_ALG_TRUNCATED_MAC(mac_alg, mac_length)                      \
+    (((mac_alg) & ~PSA_ALG_MAC_TRUNCATION_MASK) |                       \
      ((mac_length) << PSA_MAC_TRUNCATION_OFFSET & PSA_ALG_MAC_TRUNCATION_MASK))
 
 /** Macro to build the base MAC algorithm corresponding to a truncated
  * MAC algorithm.
  *
- * \param alg           A MAC algorithm identifier (value of type
+ * \param mac_alg       A MAC algorithm identifier (value of type
  *                      #psa_algorithm_t such that #PSA_ALG_IS_MAC(\p alg)
  *                      is true). This may be a truncated or untruncated
  *                      MAC algorithm.
@@ -815,12 +815,12 @@ typedef uint32_t psa_algorithm_t;
  * \return              Unspecified if \p alg is not a supported
  *                      MAC algorithm.
  */
-#define PSA_ALG_FULL_LENGTH_MAC(alg)            \
-    ((alg) & ~PSA_ALG_MAC_TRUNCATION_MASK)
+#define PSA_ALG_FULL_LENGTH_MAC(mac_alg)        \
+    ((mac_alg) & ~PSA_ALG_MAC_TRUNCATION_MASK)
 
 /** Length to which a MAC algorithm is truncated.
  *
- * \param alg           A MAC algorithm identifier (value of type
+ * \param mac_alg       A MAC algorithm identifier (value of type
  *                      #psa_algorithm_t such that #PSA_ALG_IS_MAC(\p alg)
  *                      is true).
  *
@@ -829,8 +829,8 @@ typedef uint32_t psa_algorithm_t;
  * \return              Unspecified if \p alg is not a supported
  *                      MAC algorithm.
  */
-#define PSA_MAC_TRUNCATED_LENGTH(alg)           \
-    (((alg) & PSA_ALG_MAC_TRUNCATION_MASK) >> PSA_MAC_TRUNCATION_OFFSET)
+#define PSA_MAC_TRUNCATED_LENGTH(mac_alg)                               \
+    (((mac_alg) & PSA_ALG_MAC_TRUNCATION_MASK) >> PSA_MAC_TRUNCATION_OFFSET)
 
 #define PSA_ALG_CIPHER_MAC_BASE                 ((psa_algorithm_t)0x02c00000)
 #define PSA_ALG_CBC_MAC                         ((psa_algorithm_t)0x02c00001)
@@ -927,7 +927,7 @@ typedef uint32_t psa_algorithm_t;
  * Depending on the algorithm, the tag length may affect the calculation
  * of the ciphertext.
  *
- * \param alg           A AEAD algorithm identifier (value of type
+ * \param aead_alg      An AEAD algorithm identifier (value of type
  *                      #psa_algorithm_t such that #PSA_ALG_IS_AEAD(\p alg)
  *                      is true).
  * \param tag_length    Desired length of the authentication tag in bytes.
@@ -938,26 +938,26 @@ typedef uint32_t psa_algorithm_t;
  *                      AEAD algorithm or if \p tag_length is not valid
  *                      for the specified AEAD algorithm.
  */
-#define PSA_ALG_AEAD_WITH_TAG_LENGTH(alg, tag_length)                   \
-    (((alg) & ~PSA_ALG_AEAD_TAG_LENGTH_MASK) |                          \
+#define PSA_ALG_AEAD_WITH_TAG_LENGTH(aead_alg, tag_length)              \
+    (((aead_alg) & ~PSA_ALG_AEAD_TAG_LENGTH_MASK) |                     \
      ((tag_length) << PSA_AEAD_TAG_LENGTH_OFFSET &                      \
       PSA_ALG_AEAD_TAG_LENGTH_MASK))
 
 /** Calculate the corresponding AEAD algorithm with the default tag length.
  *
- * \param alg   An AEAD algorithm (\c PSA_ALG_XXX value such that
- *              #PSA_ALG_IS_AEAD(\p alg) is true).
+ * \param aead_alg      An AEAD algorithm (\c PSA_ALG_XXX value such that
+ *                      #PSA_ALG_IS_AEAD(\p alg) is true).
  *
- * \return      The corresponding AEAD algorithm with the default tag length
- *              for that algorithm.
+ * \return              The corresponding AEAD algorithm with the default
+ *                      tag length for that algorithm.
  */
-#define PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH(alg)                       \
+#define PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH(aead_alg)                  \
     (                                                                   \
-        PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(alg, PSA_ALG_CCM)   \
-        PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(alg, PSA_ALG_GCM)   \
+        PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(aead_alg, PSA_ALG_CCM) \
+        PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(aead_alg, PSA_ALG_GCM) \
         0)
-#define PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(alg, ref) \
-    PSA_ALG_AEAD_WITH_TAG_LENGTH(alg, 0) == \
+#define PSA__ALG_AEAD_WITH_DEFAULT_TAG_LENGTH__CASE(aead_alg, ref)      \
+    PSA_ALG_AEAD_WITH_TAG_LENGTH(aead_alg, 0) ==                        \
     PSA_ALG_AEAD_WITH_TAG_LENGTH(ref, 0) ?  \
     ref :
 
