@@ -75,7 +75,6 @@
 #include "mbedtls/pem.h"
 #include "mbedtls/pk.h"
 #include "mbedtls/pk_internal.h"
-#include "mbedtls/pkcs11.h"
 #include "mbedtls/pkcs12.h"
 #include "mbedtls/pkcs5.h"
 #include "mbedtls/platform_time.h"
