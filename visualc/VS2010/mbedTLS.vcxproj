@@ -238,6 +238,7 @@
     <ClInclude Include="..\..\include\psa\crypto_values.h" />
     <ClInclude Include="..\..\library/psa_crypto_core.h" />
     <ClInclude Include="..\..\library/psa_crypto_invasive.h" />
+    <ClInclude Include="..\..\library/psa_crypto_its.h" />
     <ClInclude Include="..\..\library/psa_crypto_service_integration.h" />
     <ClInclude Include="..\..\library/psa_crypto_slot_management.h" />
     <ClInclude Include="..\..\library/psa_crypto_storage.h" />
@@ -303,6 +304,7 @@
     <ClCompile Include="..\..\library\psa_crypto_storage.c" />
     <ClCompile Include="..\..\library\psa_crypto_storage_file.c" />
     <ClCompile Include="..\..\library\psa_crypto_storage_its.c" />
+    <ClCompile Include="..\..\library\psa_its_file.c" />
     <ClCompile Include="..\..\library\ripemd160.c" />
     <ClCompile Include="..\..\library\rsa.c" />
     <ClCompile Include="..\..\library\rsa_internal.c" />
