@@ -860,7 +860,7 @@ typedef struct psa_drv_key_derivation_opaque_context_s psa_drv_key_derivation_op
  * \param[in,out] p_context A hardware-specific structure containing any
  *                          context information for the implementation
  * \param[in] kdf_alg       The algorithm to be used for the key derivation
- * \param[in] souce_key     The key to be used as the source material for the
+ * \param[in] source_key    The key to be used as the source material for the
  *                          key derivation
  *
  * \retval PSA_SUCCESS
