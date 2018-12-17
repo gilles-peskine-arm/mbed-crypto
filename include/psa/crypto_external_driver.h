@@ -809,38 +809,38 @@ typedef struct {
  * for both of the flows.
  *
  * There are two different final functions for the flows,
- * `psa_drv_key_derivation_derive` and `psa_drv_key_derivation_export`.
- * `psa_drv_key_derivation_derive` is used when the key material should be placed
+ * `psa_drv_key_derivation_opaque_derive` and `psa_drv_key_derivation_opaque_export`.
+ * `psa_drv_key_derivation_opaque_derive` is used when the key material should be placed
  * in a slot on the hardware and not exposed to the caller.
- * `psa_drv_key_derivation_export` is used when the key material should be returned
+ * `psa_drv_key_derivation_opaque_export` is used when the key material should be returned
  * to the PSA Cryptographic API implementation.
  *
  * Different key derivation algorithms require a different number of inputs.
  * Instead of having an API that takes as input variable length arrays, which
  * can be problemmatic to manage on embedded platforms, the inputs are passed
- * to the driver via a function, `psa_drv_key_derivation_collateral`, that is
+ * to the driver via a function, `psa_drv_key_derivation_opaque_collateral`, that is
  * called multiple times with different `collateral_id`s. Thus, for a key
  * derivation algorithm that required 3 paramter inputs, the flow would look
  * something like:
  * ~~~~~~~~~~~~~{.c}
- * psa_drv_key_derivation_setup(kdf_algorithm, source_key, dest_key_size_bytes);
- * psa_drv_key_derivation_collateral(kdf_algorithm_collateral_id_0,
+ * psa_drv_key_derivation_opaque_setup(kdf_algorithm, source_key, dest_key_size_bytes);
+ * psa_drv_key_derivation_opaque_collateral(kdf_algorithm_collateral_id_0,
  *                                   p_collateral_0,
  *                                   collateral_0_size);
- * psa_drv_key_derivation_collateral(kdf_algorithm_collateral_id_1,
+ * psa_drv_key_derivation_opaque_collateral(kdf_algorithm_collateral_id_1,
  *                                   p_collateral_1,
  *                                   collateral_1_size);
- * psa_drv_key_derivation_collateral(kdf_algorithm_collateral_id_2,
+ * psa_drv_key_derivation_opaque_collateral(kdf_algorithm_collateral_id_2,
  *                                   p_collateral_2,
  *                                   collateral_2_size);
- * psa_drv_key_derivation_derive();
+ * psa_drv_key_derivation_opaque_derive();
  * ~~~~~~~~~~~~~
  *
  * key agreement example:
  * ~~~~~~~~~~~~~{.c}
- * psa_drv_key_derivation_setup(alg, source_key. dest_key_size_bytes);
- * psa_drv_key_derivation_collateral(DHE_PUBKEY, p_pubkey, pubkey_size);
- * psa_drv_key_derivation_export(p_session_key,
+ * psa_drv_key_derivation_opaque_setup(alg, source_key. dest_key_size_bytes);
+ * psa_drv_key_derivation_opaque_collateral(DHE_PUBKEY, p_pubkey, pubkey_size);
+ * psa_drv_key_derivation_opaque_export(p_session_key,
  *                               session_key_size,
  *                               &session_key_length);
  * ~~~~~~~~~~~~~
@@ -852,7 +852,7 @@ typedef struct {
  * The contents of this structure are implementation dependent and are
  * therefore not described here
  */
-typedef struct psa_drv_key_derivation_context_s psa_drv_key_derivation_context_t;
+typedef struct psa_drv_key_derivation_opaque_context_s psa_drv_key_derivation_opaque_context_t;
 
 /** \brief Set up a key derivation operation by specifying the algorithm and
  * the source key sot
@@ -865,7 +865,7 @@ typedef struct psa_drv_key_derivation_context_s psa_drv_key_derivation_context_t
  *
  * \retval PSA_SUCCESS
  */
-typedef psa_status_t (*psa_drv_key_derivation_setup_t)(psa_drv_key_derivation_context_t *p_context,
+typedef psa_status_t (*psa_drv_key_derivation_opaque_setup_t)(psa_drv_key_derivation_opaque_context_t *p_context,
                                                        psa_algorithm_t kdf_alg,
                                                        psa_opaque_key_context_t source_key);
 
@@ -884,7 +884,7 @@ typedef psa_status_t (*psa_drv_key_derivation_setup_t)(psa_drv_key_derivation_co
  *
  * \retval PSA_SUCCESS
  */
-typedef psa_status_t (*psa_drv_key_derivation_collateral_t)(psa_drv_key_derivation_context_t *p_context,
+typedef psa_status_t (*psa_drv_key_derivation_opaque_collateral_t)(psa_drv_key_derivation_opaque_context_t *p_context,
                                                             uint32_t collateral_id,
                                                             const uint8_t *p_collateral,
                                                             size_t collateral_size);
@@ -898,7 +898,7 @@ typedef psa_status_t (*psa_drv_key_derivation_collateral_t)(psa_drv_key_derivati
  *
  * \retval PSA_SUCCESS
  */
-typedef psa_status_t (*psa_drv_key_derivation_derive_t)(psa_drv_key_derivation_context_t *p_context,
+typedef psa_status_t (*psa_drv_key_derivation_opaque_derive_t)(psa_drv_key_derivation_opaque_context_t *p_context,
                                                         psa_opaque_key_context_t dest_key);
 
 /** \brief Perform the final step of a key agreement and place the generated
@@ -912,7 +912,7 @@ typedef psa_status_t (*psa_drv_key_derivation_derive_t)(psa_drv_key_derivation_c
  *
  * \retval PSA_SUCCESS
  */
-typedef psa_status_t (*psa_drv_key_derivation_export_t)(uint8_t *p_output,
+typedef psa_status_t (*psa_drv_key_derivation_opaque_export_t)(uint8_t *p_output,
                                                         size_t output_size,
                                                         size_t *p_output_length);
 
@@ -927,15 +927,15 @@ typedef psa_status_t (*psa_drv_key_derivation_export_t)(uint8_t *p_output,
  */
 typedef struct {
     /** Function that performs the key derivation setup */
-    psa_drv_key_derivation_setup_t      setup;
+    psa_drv_key_derivation_opaque_setup_t      setup;
     /** Function that sets the key derivation collateral */
-    psa_drv_key_derivation_collateral_t collateral;
+    psa_drv_key_derivation_opaque_collateral_t collateral;
     /** Function that performs the final key derivation step */
-    psa_drv_key_derivation_derive_t     derive;
+    psa_drv_key_derivation_opaque_derive_t     derive;
     /** Function that perforsm the final key derivation or agreement and
      * exports the key */
-    psa_drv_key_derivation_export_t     export;
-} psa_drv_key_derivation_t;
+    psa_drv_key_derivation_opaque_export_t     export;
+} psa_drv_key_derivation_opaque_t;
 
 /**@}*/
 
