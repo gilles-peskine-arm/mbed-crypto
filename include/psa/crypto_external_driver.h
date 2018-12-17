@@ -998,6 +998,83 @@ typedef struct {
 
 /**@}*/
 
+/** \defgroup external_driver_registration External cryptoprocessor driver registration
+ */
+/**@{*/
+
+/** A structure containing pointers to all the entry points of an
+ * external coprocessor driver.
+ *
+ * Future versions of this specification may add extra substructures at
+ * the end of this structure.
+ */
+typedef struct {
+    /** The version of the driver model that this driver implements.
+     * This is a protection against linking driver binaries built against
+     * a different version of this specification.
+     * Use #PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION.
+     */
+    uintptr_t model_version;
+    psa_drv_open_key_t open;
+    psa_drv_close_key_t close;
+    psa_drv_key_management_t import_export;
+    psa_drv_mac_opaque_t mac;
+    psa_drv_cipher_opaque_t cipher;
+    psa_drv_aead_opaque_t aead;
+    psa_drv_key_derivation_opaque_t derivation;
+    psa_drv_asymmetric_opaque_t asymmetric;
+} psa_drv_external_cryptoprocessor_t;
+
+/** The current version of the opaque driver model.
+ */
+#define PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION 0x00000004
+
+/** Register an external cryptoprocessor driver.
+ *
+ * This function is only intended to be used by driver code, not by
+ * application code. In implementations with separation between the
+ * PSA cryptography module and applications, this function should
+ * only be available to callers that run in the same memory space as
+ * the cryptography module, and should not be exposed to applications
+ * running in a different memory space.
+ *
+ * This function may be called before psa_crypto_init(). It is
+ * implementation-defined whether this function may be called
+ * after psa_crypto_init().
+ *
+ * \param lifetime      The lifetime value through which this driver will
+ *                      be exposed to applications.
+ *                      The values #PSA_KEY_LIFETIME_VOLATILE and
+ *                      #PSA_KEY_LIFETIME_PERSISTENT are reserved and
+ *                      may not be used for opaque drivers. Implementations
+ *                      may reserve other values.
+ * \param[in] methods   The method table of the driver. This structure must
+ *                      remain valid for as long as the cryptography
+ *                      module keeps running. It is typically a global
+ *                      constant.
+ *
+ * \return PSA_SUCCESS
+ *         The driver was successfully registered. Applications can now
+ *         use \p lifetime to access keys through the methods passed to
+ *         this function.
+ * \return PSA_ERROR_BAD_STATE
+ *         This function was called after the initialization of the
+ *         cryptography module, and this implementation does not support
+ *         driver registration at this stage.
+ * \return PSA_ERROR_INVALID_ARGUMENT
+ *         \p lifetime is a reserved value or there is already a registered
+ *         driver for this value.
+ * \return PSA_ERROR_NOT_SUPPORTED
+ *         `methods->model_version` is not supported by this implementation.
+ * \return PSA_ERROR_INSUFFICIENT_MEMORY
+ * \return PSA_ERROR_NOT_PERMITTED
+ */
+psa_status_t psa_crypto_drv_opaque_register(
+    psa_key_lifetime_t lifetime,
+    const psa_drv_external_cryptoprocessor_t *methods);
+
+/**@}*/
+
 #ifdef __cplusplus
 }
 #endif
