@@ -54,6 +54,65 @@ extern "C" {
  */
 typedef uintptr_t psa_opaque_key_context_t;
 
+/** \defgroup key_access Key access
+ *
+ * To access a key, the PSA Crypto implementation core calls the driver's
+ * #psa_drv_open_key_t function to obtain a key context. When the key
+ * is no longer needed, the core calls the driver's #psa_drv_close_key_t
+ * function.
+ */
+/**@{*/
+
+/** In #psa_drv_open_key_t, whether to create a new key. */
+#define PSA_DRV_OPEN_KEY_CREATE                 ((uint32_t)0x00000001)
+
+/** \brief Open a key located in an external cryptoprocessor.
+ *
+ * If \p flags contains #PSA_DRV_OPEN_KEY_CREATE, the key must not exist
+ * yet and this function creates it. Otherwise the key must exist.
+ *
+ * \param lifetime      The key lifetime. This is guaranteed to be the
+ *                      life value passed when the driver was registered.
+ * \param key_id        The key identifier to open.
+ * \param flags         A mask of `PSA_DRV_OPEN_KEY_XXX` values.
+ * \param[out] key_ctx  On success, a key context value that the core can use
+ *                      to refer to the key. This context value must remain
+ *                      valid until the key is closed with the driver's
+ *                      #psa_drv_close_key_t function or destroyed with
+ *                      the driver's #psa_drv_destroy_key_t function.
+ *
+ * \retval PSA_SUCCESS
+ * \retval PSA_ERROR_INVALID_ARGUMENT
+ * \retval PSA_ERROR_NOT_SUPPORTED
+ * \retval PSA_ERROR_INSUFFICIENT_MEMORY
+ * \retval PSA_ERROR_STORAGE_FAILURE
+ * \retval PSA_ERROR_NOT_PERMITTED
+ * \retval PSA_ERROR_COMMUNICATION_FAILURE
+ */
+typedef psa_status_t (*psa_drv_open_key_t)(
+    psa_key_lifetime_t lifetime,
+    psa_key_id_t key_id,
+    uint32_t flags,
+    psa_opaque_key_context_t *key_ctx);
+
+/** \brief Close a key located in an external cryptoprocessor.
+ *
+ * The driver should free all runtime resources associated with the key.
+ * The key can be opened again later until it is either explicitly
+ * destroyed via the driver's #psa_drv_destroy_key_t function or until it
+ * is implicitly destroy due to the driver's lifetime rules.
+ *
+ * \param key_ctx       The key context to close. When this function returns,
+ *                      the context is not longer valid.
+ *
+ * \retval PSA_SUCCESS
+ * \retval PSA_ERROR_STORAGE_FAILURE
+ * \retval PSA_ERROR_COMMUNICATION_FAILURE
+ */
+typedef psa_status_t (*psa_drv_close_key_t)(
+    psa_opaque_key_context_t key_ctx);
+
+/**@}*/
 
 /** \defgroup opaque_mac Opaque Message Authentication Code
  * Generation and authentication of Message Authentication Codes (MACs) using
