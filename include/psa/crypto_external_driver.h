@@ -777,32 +777,6 @@ typedef psa_status_t (*psa_drv_export_key_t)(psa_opaque_key_context_t key,
                                              size_t *p_data_length);
 
 /**
- * \brief Export a public key or the public part of a key pair in binary format
- *
- * The output of this function can be passed to psa_import_key() to
- * create an object that is equivalent to the public key.
- *
- * For standard key types, the output format is as follows:
- *
- * - For RSA keys (#PSA_KEY_TYPE_RSA_KEYPAIR or #PSA_KEY_TYPE_RSA_PUBLIC_KEY),
- *   the format is the DER representation of the public key defined by RFC 5280
- *   as SubjectPublicKeyInfo.
- *
- * \param[in] key_slot          Slot whose content is to be exported. This must
- *                              be an occupied key slot.
- * \param[out] p_data           Buffer where the key data is to be written.
- * \param[in] data_size         Size of the `data` buffer in bytes.
- * \param[out] p_data_length    On success, the number of bytes
- *                              that make up the key data.
- *
- * \retval #PSA_SUCCESS
- */
-typedef psa_status_t (*psa_drv_export_public_key_t)(psa_key_slot_t key,
-                                                    uint8_t *p_data,
-                                                    size_t data_size,
-                                                    size_t *p_data_length);
-
-/**
  * \brief A struct containing all of the function pointers needed to for key
  * management using opaque keys
  *
@@ -818,6 +792,8 @@ typedef struct {
     psa_drv_destroy_key_t       destroy;
     /** Function that performs the key export operation */
     psa_drv_export_key_t        export;
+    /** Function that performs the public key export operation */
+    psa_drv_export_key_t        export_public;
 } psa_drv_key_management_t;
 
 /**@}*/
