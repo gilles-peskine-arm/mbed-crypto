@@ -53,13 +53,13 @@ Open failure: volatile lifetime
 open_fail:PSA_KEY_LIFETIME_VOLATILE:1:PSA_ERROR_INVALID_ARGUMENT
 
 Open failure: invalid lifetime
-open_fail:0x7fffffff:0:PSA_ERROR_INVALID_ARGUMENT
+open_fail:0x7fffffff:0:PSA_ERROR_NOT_SUPPORTED
 
 Create failure: volatile lifetime
 create_fail:PSA_KEY_LIFETIME_VOLATILE:1:PSA_KEY_TYPE_RAW_DATA:8:PSA_ERROR_INVALID_ARGUMENT
 
 Create failure: invalid lifetime
-create_fail:0x7fffffff:0:PSA_KEY_TYPE_RAW_DATA:8:PSA_ERROR_INVALID_ARGUMENT
+create_fail:0x7fffffff:0:PSA_KEY_TYPE_RAW_DATA:8:PSA_ERROR_NOT_SUPPORTED
 
 Create failure: invalid key id (0)
 depends_on:MBEDTLS_PSA_CRYPTO_STORAGE_C

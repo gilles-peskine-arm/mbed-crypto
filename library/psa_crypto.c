@@ -43,6 +43,8 @@
 
 #include "psa/crypto.h"
 
+#include "psa/crypto_external_driver.h"
+
 #include "psa_crypto_core.h"
 #include "psa_crypto_invasive.h"
 #include "psa_crypto_slot_management.h"
@@ -119,6 +121,12 @@ static int key_type_is_raw_bytes( psa_key_type_t type )
     return( PSA_KEY_TYPE_IS_UNSTRUCTURED( type ) );
 }
 
+typedef struct
+{
+    psa_key_lifetime_t lifetime;
+    const psa_drv_external_cryptoprocessor_t *methods;
+} psa_opaque_driver_table_entry_t;
+
 /* Values for psa_global_data_t::rng_state */
 #define RNG_NOT_INITIALIZED 0
 #define RNG_INITIALIZED 1
@@ -128,6 +136,7 @@ typedef struct
 {
     void (* entropy_init )( mbedtls_entropy_context *ctx );
     void (* entropy_free )( mbedtls_entropy_context *ctx );
+    psa_opaque_driver_table_entry_t opaque_drivers[PSA_MAX_OPAQUE_DRIVERS];
     mbedtls_entropy_context entropy;
     mbedtls_ctr_drbg_context ctr_drbg;
     unsigned initialized : 1;
@@ -608,9 +617,15 @@ exit:
 }
 #endif /* defined(MBEDTLS_ECP_C) */
 
-/** Import key data into a slot. `slot->type` must have been set
- * previously. This function assumes that the slot does not contain
- * any key material yet. On failure, the slot content is unchanged. */
+/** Import key data into a slot.
+ *
+ * The key must be transparent.
+ *
+ * `slot->type` must have been set  previously.
+ * This function assumes that the slot does not contain  any key material yet.
+ *
+ * On failure, the slot content is unchanged.
+ */
 psa_status_t psa_import_key_into_slot( psa_key_slot_t *slot,
                                        const uint8_t *data,
                                        size_t data_length )
@@ -747,6 +762,31 @@ static psa_status_t psa_get_key_from_slot( psa_key_handle_t handle,
     return( PSA_SUCCESS );
 }
 
+/** Return the driver method table associated with a key slot.
+ * If the key slot is transparent, return NULL. */
+const psa_drv_external_cryptoprocessor_t *psa_get_driver_for_slot(
+    const psa_key_slot_t *slot )
+{
+    size_t i;
+    if( slot->lifetime == PSA_KEY_LIFETIME_VOLATILE ||
+        slot->lifetime == PSA_KEY_LIFETIME_PERSISTENT )
+    {
+        /* Ensure that we never call driver code for built-in lifetime
+         * values. This is both a sanity check and a run time
+         *  optimization. */
+        return( NULL );
+    }
+
+    for( i = 0; i < ARRAY_LENGTH( global_data.opaque_drivers ); i++ )
+    {
+        if( global_data.opaque_drivers[i].lifetime == slot->lifetime )
+            return( global_data.opaque_drivers[i].methods );
+        else if ( global_data.opaque_drivers[i].lifetime == 0 )
+            return( NULL );
+    }
+    return( NULL );
+}
+
 /** Wipe key data from a slot. Preserve metadata such as the policy. */
 static psa_status_t psa_remove_key_data_from_memory( psa_key_slot_t *slot )
 {
@@ -788,7 +828,13 @@ static psa_status_t psa_remove_key_data_from_memory( psa_key_slot_t *slot )
  * Persistent storage is not affected. */
 psa_status_t psa_wipe_key_slot( psa_key_slot_t *slot )
 {
-    psa_status_t status = psa_remove_key_data_from_memory( slot );
+    const psa_drv_external_cryptoprocessor_t *drv =
+        psa_get_driver_for_slot( slot );
+    psa_status_t status;
+    if( drv != NULL )
+        status = PSA_SUCCESS;
+    else
+        status = psa_remove_key_data_from_memory( slot );
     /* At this point, key material and other type-specific content has
      * been wiped. Clear remaining metadata. We can call memset and not
      * zeroize because the metadata is not particularly sensitive. */
@@ -802,6 +848,7 @@ psa_status_t psa_import_key( psa_key_handle_t handle,
                              size_t data_length )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
 
     status = psa_get_empty_key_slot( handle, &slot );
@@ -810,7 +857,20 @@ psa_status_t psa_import_key( psa_key_handle_t handle,
 
     slot->type = type;
 
-    status = psa_import_key_into_slot( slot, data, data_length );
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->import_export.import == NULL )
+            status = PSA_ERROR_NOT_SUPPORTED;
+        else
+            status = drv->import_export.import( slot->data.opaque,
+                                                type,
+                                                slot->policy.alg,
+                                                slot->policy.usage,
+                                                data, data_length );
+    }
+    else
+        status = psa_import_key_into_slot( slot, data, data_length );
     if( status != PSA_SUCCESS )
     {
         slot->type = PSA_KEY_TYPE_NONE;
@@ -835,6 +895,29 @@ psa_status_t psa_import_key( psa_key_handle_t handle,
     return( status );
 }
 
+static psa_status_t psa_destroy_key_in_storage( psa_key_slot_t *slot )
+{
+    const psa_drv_external_cryptoprocessor_t *drv;
+
+#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
+    if( slot->lifetime == PSA_KEY_LIFETIME_PERSISTENT )
+    {
+        return( psa_destroy_persistent_key( slot->persistent_storage_id ) );
+    }
+#endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->import_export.destroy == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        else
+            return( drv->import_export.destroy( slot->data.opaque ) );
+    }
+
+    return( PSA_SUCCESS );
+}
+
 psa_status_t psa_destroy_key( psa_key_handle_t handle )
 {
     psa_key_slot_t *slot;
@@ -844,20 +927,16 @@ psa_status_t psa_destroy_key( psa_key_handle_t handle )
     status = psa_get_key_slot( handle, &slot );
     if( status != PSA_SUCCESS )
         return( status );
-#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
-    if( slot->lifetime == PSA_KEY_LIFETIME_PERSISTENT )
-    {
-        storage_status =
-            psa_destroy_persistent_key( slot->persistent_storage_id );
-    }
-#endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
+
+    storage_status = psa_destroy_key_in_storage( slot );
+
     status = psa_wipe_key_slot( slot );
     if( status != PSA_SUCCESS )
         return( status );
     return( storage_status );
 }
 
-/* Return the size of the key in the given slot, in bits. */
+/* Return the size of the key in the given transparent slot, in bits. */
 static size_t psa_get_key_bits( const psa_key_slot_t *slot )
 {
     if( key_type_is_raw_bytes( slot->type ) )
@@ -879,6 +958,7 @@ psa_status_t psa_get_key_information( psa_key_handle_t handle,
                                       size_t *bits )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
 
     if( type != NULL )
@@ -891,6 +971,14 @@ psa_status_t psa_get_key_information( psa_key_handle_t handle,
 
     if( slot->type == PSA_KEY_TYPE_NONE )
         return( PSA_ERROR_EMPTY_SLOT );
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        /* this is currently missing from the driver model */
+        return( PSA_ERROR_NOT_SUPPORTED );
+    }
+
     if( type != NULL )
         *type = slot->type;
     if( bits != NULL )
@@ -1006,12 +1094,14 @@ static  psa_status_t psa_internal_export_key( psa_key_slot_t *slot,
     }
 }
 
-psa_status_t psa_export_key( psa_key_handle_t handle,
-                             uint8_t *data,
-                             size_t data_size,
-                             size_t *data_length )
+static psa_status_t psa_export_key_common( psa_key_handle_t handle,
+                                           uint8_t *data,
+                                           size_t data_size,
+                                           size_t *data_length,
+                                           int public )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
 
     /* Set the key to empty now, so that even when there are errors, we always
@@ -1023,11 +1113,35 @@ psa_status_t psa_export_key( psa_key_handle_t handle,
     /* Export requires the EXPORT flag. There is an exception for public keys,
      * which don't require any flag, but psa_get_key_from_slot takes
      * care of this. */
-    status = psa_get_key_from_slot( handle, &slot, PSA_KEY_USAGE_EXPORT, 0 );
+    status = psa_get_key_from_slot( handle, &slot,
+                                    public ? 0 : PSA_KEY_USAGE_EXPORT,
+                                    0 );
     if( status != PSA_SUCCESS )
         return( status );
-    return( psa_internal_export_key( slot, data, data_size,
-                                     data_length, 0 ) );
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        psa_drv_export_key_t method = ( public ?
+                                        drv->import_export.export_public :
+                                        drv->import_export.export );
+        if( method == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        return( method( slot->data.opaque,
+                        data, data_size, data_length ) );
+    }
+
+    return( psa_internal_export_key( slot,
+                                     data, data_size, data_length,
+                                     public ) );
+}
+
+psa_status_t psa_export_key( psa_key_handle_t handle,
+                             uint8_t *data,
+                             size_t data_size,
+                             size_t *data_length )
+{
+    return( psa_export_key_common( handle, data, data_size, data_length, 0 ) );
 }
 
 psa_status_t psa_export_public_key( psa_key_handle_t handle,
@@ -1035,21 +1149,7 @@ psa_status_t psa_export_public_key( psa_key_handle_t handle,
                                     size_t data_size,
                                     size_t *data_length )
 {
-    psa_key_slot_t *slot;
-    psa_status_t status;
-
-    /* Set the key to empty now, so that even when there are errors, we always
-     * set data_length to a value between 0 and data_size. On error, setting
-     * the key to empty is a good choice because an empty key representation is
-     * unlikely to be accepted anywhere. */
-    *data_length = 0;
-
-    /* Exporting a public key doesn't require a usage flag. */
-    status = psa_get_key_from_slot( handle, &slot, 0, 0 );
-    if( status != PSA_SUCCESS )
-        return( status );
-    return( psa_internal_export_key( slot, data, data_size,
-                                     data_length, 1 ) );
+    return( psa_export_key_common( handle, data, data_size, data_length, 1 ) );
 }
 
 #if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
@@ -2324,6 +2424,7 @@ psa_status_t psa_asymmetric_sign( psa_key_handle_t handle,
                                   size_t *signature_length )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
 
     *signature_length = signature_size;
@@ -2335,6 +2436,17 @@ psa_status_t psa_asymmetric_sign( psa_key_handle_t handle,
     {
         status = PSA_ERROR_INVALID_ARGUMENT;
         goto exit;
+    }
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->asymmetric.sign == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        return( drv->asymmetric.sign( slot->data.opaque,
+                                      alg, hash, hash_length,
+                                      signature, signature_size,
+                                      signature_length ) );
     }
 
 #if defined(MBEDTLS_RSA_C)
@@ -2399,11 +2511,22 @@ psa_status_t psa_asymmetric_verify( psa_key_handle_t handle,
                                     size_t signature_length )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
 
     status = psa_get_key_from_slot( handle, &slot, PSA_KEY_USAGE_VERIFY, alg );
     if( status != PSA_SUCCESS )
         return( status );
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->asymmetric.verify == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        return( drv->asymmetric.verify( slot->data.opaque,
+                                        alg, hash, hash_length,
+                                        signature, signature_length ) );
+    }
 
 #if defined(MBEDTLS_RSA_C)
     if( PSA_KEY_TYPE_IS_RSA( slot->type ) )
@@ -2458,13 +2581,8 @@ psa_status_t psa_asymmetric_encrypt( psa_key_handle_t handle,
                                      size_t *output_length )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
-
-    (void) input;
-    (void) input_length;
-    (void) salt;
-    (void) output;
-    (void) output_size;
 
     *output_length = 0;
 
@@ -2477,6 +2595,19 @@ psa_status_t psa_asymmetric_encrypt( psa_key_handle_t handle,
     if( ! ( PSA_KEY_TYPE_IS_PUBLIC_KEY( slot->type ) ||
             PSA_KEY_TYPE_IS_KEYPAIR( slot->type ) ) )
         return( PSA_ERROR_INVALID_ARGUMENT );
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->asymmetric.encrypt == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        return( drv->asymmetric.encrypt( slot->data.opaque,
+                                         alg,
+                                         input, input_length,
+                                         salt, salt_length,
+                                         output, output_size,
+                                         output_length ) );
+    }
 
 #if defined(MBEDTLS_RSA_C)
     if( PSA_KEY_TYPE_IS_RSA( slot->type ) )
@@ -2538,13 +2669,8 @@ psa_status_t psa_asymmetric_decrypt( psa_key_handle_t handle,
                                      size_t *output_length )
 {
     psa_key_slot_t *slot;
+    const psa_drv_external_cryptoprocessor_t *drv;
     psa_status_t status;
-
-    (void) input;
-    (void) input_length;
-    (void) salt;
-    (void) output;
-    (void) output_size;
 
     *output_length = 0;
 
@@ -2556,6 +2682,19 @@ psa_status_t psa_asymmetric_decrypt( psa_key_handle_t handle,
         return( status );
     if( ! PSA_KEY_TYPE_IS_KEYPAIR( slot->type ) )
         return( PSA_ERROR_INVALID_ARGUMENT );
+
+    drv = psa_get_driver_for_slot( slot );
+    if( drv != NULL )
+    {
+        if( drv->asymmetric.encrypt == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        return( drv->asymmetric.encrypt( slot->data.opaque,
+                                         alg,
+                                         input, input_length,
+                                         salt, salt_length,
+                                         output, output_size,
+                                         output_length ) );
+    }
 
 #if defined(MBEDTLS_RSA_C)
     if( slot->type == PSA_KEY_TYPE_RSA_KEYPAIR )
@@ -4362,6 +4501,45 @@ psa_status_t mbedtls_psa_crypto_configure_entropy_sources(
     global_data.entropy_init = entropy_init;
     global_data.entropy_free = entropy_free;
     return( PSA_SUCCESS );
+}
+
+psa_status_t psa_crypto_drv_opaque_register(
+    psa_key_lifetime_t lifetime,
+    const psa_drv_external_cryptoprocessor_t *methods )
+{
+    size_t i;
+
+    if( methods->model_version != PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION )
+        return( PSA_ERROR_NOT_SUPPORTED );
+    if( lifetime == PSA_KEY_LIFETIME_VOLATILE ||
+        lifetime == PSA_KEY_LIFETIME_PERSISTENT )
+    {
+        return( PSA_ERROR_INVALID_ARGUMENT );
+    }
+
+    for( i = 0; i < ARRAY_LENGTH( global_data.opaque_drivers ); i++ )
+    {
+        psa_opaque_driver_table_entry_t *entry =
+            &global_data.opaque_drivers[i];
+        if( entry->lifetime == 0 )
+        {
+            /* This entry is free. */
+            entry->lifetime = lifetime;
+            entry->methods = methods;
+            return( PSA_SUCCESS );
+        }
+        else if( entry->lifetime == lifetime )
+        {
+            /* There is already a registered driver for this lifetime.
+             * We'll always reach this point in this case because
+             * entries in the opaque driver table are consecutive:
+             * there can't be a free hole followed by a used entry. */
+            return( PSA_ERROR_INVALID_ARGUMENT );
+        }
+    }
+    /* If we reach this point, it means there was no free space in the
+     * opaque driver table. */
+    return( PSA_ERROR_INSUFFICIENT_MEMORY );
 }
 
 void mbedtls_psa_crypto_free( void )

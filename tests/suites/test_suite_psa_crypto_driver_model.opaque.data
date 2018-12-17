@@ -1,0 +1,35 @@
+Register opaque driver: good
+register_opaque:2:PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION:PSA_SUCCESS
+
+Register opaque driver: lifetime=VOLATILE
+register_opaque:PSA_KEY_LIFETIME_VOLATILE:PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION:PSA_ERROR_INVALID_ARGUMENT
+
+Register opaque driver: lifetime=PERSISTENT
+register_opaque:PSA_KEY_LIFETIME_PERSISTENT:PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION:PSA_ERROR_INVALID_ARGUMENT
+
+Register opaque driver: bad version
+register_opaque:2:PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION+1:PSA_ERROR_NOT_SUPPORTED
+
+Register opaque driver: all good
+register_opaque_4:2:PSA_SUCCESS:3:PSA_SUCCESS:4:PSA_SUCCESS:5:PSA_SUCCESS
+
+Register opaque driver: lifetime value repeated immediately
+register_opaque_4:2:PSA_SUCCESS:2:PSA_ERROR_INVALID_ARGUMENT:3:PSA_SUCCESS:3:PSA_ERROR_INVALID_ARGUMENT
+
+Register opaque driver: repeated lifetime value repeated later
+register_opaque_4:2:PSA_SUCCESS:3:PSA_SUCCESS:2:PSA_ERROR_INVALID_ARGUMENT:3:PSA_ERROR_INVALID_ARGUMENT
+
+Register opaque driver: too many
+register_opaque_many:5
+
+Create/close/open
+create_close_open:
+
+Create/open without/with close
+without_and_with_close:
+
+Without/with destroy
+without_and_with_destroy:
+
+Without/with import
+without_and_with_import:

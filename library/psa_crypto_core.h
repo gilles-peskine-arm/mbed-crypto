@@ -29,9 +29,13 @@
 #endif
 
 #include "psa/crypto.h"
+#include "psa/crypto_external_driver.h"
 
 #include "mbedtls/ecp.h"
 #include "mbedtls/rsa.h"
+
+/** The maximum number of external cryptoprocessor drivers. */
+#define PSA_MAX_OPAQUE_DRIVERS 4
 
 /** The data structure representing a key slot, containing key material
  * and metadata for one key.
@@ -56,12 +60,44 @@ typedef struct
 #if defined(MBEDTLS_ECP_C)
         mbedtls_ecp_keypair *ecp;
 #endif /* MBEDTLS_ECP_C */
+        psa_opaque_key_context_t opaque;
     } data;
 } psa_key_slot_t;
+
+/** Whether the given lifetime value indicates an opaque key.
+ *
+ * This macro only categorizes lifetime values, it does not validate them.
+ * A lifetime value may be in the transparent or opaque category but
+ * nonetheless invalid.
+ *
+ * \param lifetime      The lifetime value to query.
+ *
+ * \retval 1
+ *         The key is opaque. The field of psa_key_slot_t::data in use
+ *         is psa_key_slot_t::data::opaque.
+ * \retval 0
+ *         The key is transparent. The field of psa_key_slot_t::data in use
+ *         is determined by psa_key_slot_t::type.
+ */
+#define PSA_LIFETIME_IS_OPAQUE( lifetime )      \
+    ( ( lifetime ) > PSA_KEY_LIFETIME_PERSISTENT )
+
+/** Return the driver method table associated with the specified slot.
+ *
+ * \param slot          The slot to query.
+ *
+ * \return The method table of the external driver associated with \p slot,
+ *         if the `slot->lifetime` has a registered external driver.
+ * \return \c NULL if the slot's lifetime has no associated driver. */
+const psa_drv_external_cryptoprocessor_t *psa_get_driver_for_slot(
+    const psa_key_slot_t *slot );
 
 /** Completely wipe a slot in memory, including its policy.
  *
  * Persistent storage is not affected.
+ *
+ * If the slot is external, this function only zeros out the metadata.
+ * You must call the driver's close method before calling this function.
  *
  * \param[in,out] slot  The key slot to wipe.
  *

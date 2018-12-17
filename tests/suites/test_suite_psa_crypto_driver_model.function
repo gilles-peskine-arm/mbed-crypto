@@ -1,0 +1,599 @@
+/* BEGIN_HEADER */
+#if defined(MBEDTLS_PSA_CRYPTO_SPM)
+#include "spm/psa_defs.h"
+#endif
+#include "psa/crypto.h"
+
+#include "psa/crypto_external_driver.h"
+
+#define PSA_ASSERT( expr ) TEST_ASSERT( ( expr ) == PSA_SUCCESS )
+
+/* An error that driver functions can return if the core passed them
+ * something that it shouldn't have. */
+#define PSA_ERROR_TEST_FAILED ( -0x7e570bad )
+
+/* An error that driver functions can return to exercise how the core
+ * supports an unknown error. */
+#define PSA_ERROR_INJECTED ( -0x7e570123 )
+
+/* An error that should never come up. */
+#define PSA_ERROR_FAKE_ERROR ( -0x7e570000 )
+
+/* This data structure is used as mock storage for the test driver. */
+typedef struct
+{
+    psa_key_lifetime_t lifetime;
+    psa_key_id_t key_id;
+    psa_key_type_t type;
+    psa_key_policy_t policy;
+    unsigned long nonce;
+    unsigned char *material;
+    size_t material_length;
+} test_driver_key_information_t;
+static test_driver_key_information_t test_driver_keys[10];
+static const test_driver_key_information_t *test_driver_keys_end =
+    test_driver_keys + ARRAY_LENGTH_UNSAFE( test_driver_keys );
+static unsigned long test_driver_key_nonce;
+
+typedef struct test_driver_key_context_s test_driver_key_context_t;
+struct test_driver_key_context_s
+{
+    uint32_t magic;
+    test_driver_key_context_t *self;
+    psa_key_lifetime_t lifetime;
+    psa_key_id_t key_id;
+    unsigned long nonce;
+    test_driver_key_information_t *storage;
+};
+
+#define TEST_DRIVER_MAGIC 0x2c12b0ba
+
+/* If nonzero, test_driver_open() and test_driver_close() require
+ * the lifetime to be this value. */
+static psa_key_lifetime_t test_driver_expected_lifetime;
+/* If nonzero, test_driver_open() and test_driver_close() require
+ * the key id to be this value. */
+static psa_key_lifetime_t test_driver_expected_key_id;
+
+/* Test driver functions set this global variable to their return
+ * value. This allows test code to verify status propagration. */
+static psa_status_t test_driver_status;
+
+/* Run `expr`. Test that it returned `expected_status` and that it
+ * involved a call to a function from the test driver which also
+ * returned `expected_status`. */
+#define ASSERT_WITH_DRIVER( expr, expected_status )                     \
+    do                                                                  \
+    {                                                                   \
+        test_driver_status = PSA_ERROR_FAKE_ERROR;                      \
+        TEST_ASSERT( ( expr ) == ( expected_status ) );                 \
+        TEST_ASSERT( test_driver_status == ( expected_status ) );       \
+    }                                                                   \
+    while( 0 )
+
+/* A pointer to the key that was last opened by the test driver.
+ * This is occasionally useful for inspection by the test code,
+ * or to manually manipulate this data. */
+static test_driver_key_context_t *test_driver_latest_opened_key;
+
+static psa_status_t test_driver_open( psa_key_lifetime_t lifetime,
+                                      psa_key_id_t key_id,
+                                      uint32_t flags,
+                                      psa_opaque_key_context_t *key_ctx )
+{
+    test_driver_key_context_t *kctx = NULL;
+    test_driver_key_information_t *ki;
+
+    test_driver_status = PSA_ERROR_TEST_FAILED;
+
+    /* Check that our parameters look right. */
+    if( test_driver_expected_lifetime != 0 )
+        TEST_ASSERT( lifetime == test_driver_expected_lifetime );
+    if( test_driver_expected_key_id != 0 )
+        TEST_ASSERT( key_id == test_driver_expected_key_id );
+    TEST_ASSERT( flags == 0 || flags == PSA_DRV_OPEN_KEY_CREATE );
+
+    /* Look for the desired key in the mock storage. */
+    for( ki = test_driver_keys; ki < test_driver_keys_end; ki++ )
+    {
+        if( ki->lifetime == lifetime && ki->key_id == key_id )
+            break;
+    }
+    /* At this point, ki == test_driver_keys_end iff the key didn't exist. */
+    if( flags & PSA_DRV_OPEN_KEY_CREATE )
+    {
+        if( ki != test_driver_keys_end )
+        {
+            test_driver_status = PSA_ERROR_OCCUPIED_SLOT;
+            goto exit;
+        }
+        for( ki = test_driver_keys; ki < test_driver_keys_end; ki++ )
+        {
+            if( ki->lifetime == 0 )
+                break;
+        }
+        if( ki == test_driver_keys_end )
+        {
+            test_driver_status = PSA_ERROR_INSUFFICIENT_STORAGE;
+            goto exit;
+        }
+        ki->lifetime = lifetime;
+        ki->key_id = key_id;
+        ki->nonce = ++test_driver_key_nonce;
+    }
+    else
+    {
+        if( ki == test_driver_keys_end )
+        {
+            test_driver_status = PSA_ERROR_EMPTY_SLOT;
+            goto exit;
+        }
+    }
+
+    /* Create a driver key context. */
+    ASSERT_ALLOC( kctx, 1 );
+    kctx->magic = TEST_DRIVER_MAGIC;
+    kctx->self = kctx;
+    kctx->nonce = ki->nonce;
+    kctx->lifetime = lifetime;
+    kctx->key_id = key_id;
+    kctx->storage = ki;
+    *key_ctx = (uintptr_t) kctx;
+    test_driver_latest_opened_key = kctx;
+    test_driver_status = PSA_SUCCESS;
+
+exit:
+    return( test_driver_status );
+}
+
+static psa_status_t test_driver_close( psa_opaque_key_context_t key_ctx )
+{
+    test_driver_key_context_t *kctx = (test_driver_key_context_t *) key_ctx;
+
+    test_driver_status = PSA_ERROR_TEST_FAILED;
+
+    /* Check that the key context looks right. */
+    TEST_ASSERT( kctx != NULL );
+    TEST_ASSERT( kctx->magic == TEST_DRIVER_MAGIC );
+    TEST_ASSERT( kctx->self == kctx );
+    if( test_driver_expected_lifetime != 0 )
+        TEST_ASSERT( kctx->lifetime == test_driver_expected_lifetime );
+    if( test_driver_expected_key_id != 0 )
+        TEST_ASSERT( kctx->key_id == test_driver_expected_key_id );
+    TEST_ASSERT( kctx->storage->nonce == kctx->nonce );
+    TEST_ASSERT( kctx->storage->lifetime == kctx->lifetime );
+    TEST_ASSERT( kctx->storage->key_id == kctx->key_id );
+
+    /* Free the key context. */
+    mbedtls_free( kctx );
+    /* Don't leave a potentially-invalid pointer lying around (not necessary
+     * but reduces the potential impact of a bug in the test code.) */
+    test_driver_latest_opened_key = NULL;
+    test_driver_status = PSA_SUCCESS;
+
+exit:
+    return( test_driver_status );
+}
+
+static void destroy_test_driver_slot( test_driver_key_information_t *ki )
+{
+    if( ki->material != NULL )
+        mbedtls_free( ki->material );
+    memset( ki, 0, sizeof( *ki ) );
+}
+
+static psa_status_t test_driver_destroy( psa_opaque_key_context_t key_ctx )
+{
+    test_driver_key_context_t *kctx = (test_driver_key_context_t *) key_ctx;
+    test_driver_key_information_t *ki = kctx->storage;
+    psa_status_t status = test_driver_close( key_ctx );
+    destroy_test_driver_slot( ki );
+    return( status );
+}
+
+static psa_status_t test_driver_import( psa_opaque_key_context_t key_ctx,
+                                        psa_key_type_t type,
+                                        psa_algorithm_t algorithm,
+                                        psa_key_usage_t usage,
+                                        const uint8_t *data,
+                                        size_t data_length )
+{
+    test_driver_key_context_t *kctx = (test_driver_key_context_t *) key_ctx;
+    test_driver_key_information_t *ki = kctx->storage;
+
+    test_driver_status = PSA_ERROR_TEST_FAILED;
+    TEST_ASSERT( ki->material == NULL );
+
+    test_driver_status = PSA_ERROR_INSUFFICIENT_MEMORY;
+    ASSERT_ALLOC( ki->material, data_length );
+    memcpy( ki->material, data, data_length );
+    ki->material_length = data_length;
+    ki->type = type;
+    ki->policy.alg = algorithm;
+    ki->policy.usage = usage;
+    test_driver_status = PSA_SUCCESS;
+
+exit:
+    return( test_driver_status );
+}
+
+/* Call this function in the cleanup section of every test case that
+ * calls test_driver_open(). */
+static void test_driver_purge( void )
+{
+    test_driver_key_information_t *ki;
+    for( ki = test_driver_keys; ki < test_driver_keys_end; ki++ )
+    {
+        destroy_test_driver_slot( ki );
+    }
+}
+
+static const psa_drv_external_cryptoprocessor_t open_only_driver =
+{
+    PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION,
+    test_driver_open,
+    test_driver_close,
+    {NULL, NULL, NULL, NULL},
+    {0, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+    {0, NULL, NULL, NULL, NULL, NULL, NULL},
+    {NULL, NULL},
+    {NULL, NULL, NULL, NULL},
+    {NULL, NULL, NULL, NULL},
+};
+
+#define PERSISTENT_KEY_ID_1 1
+
+#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
+#include "psa_crypto_storage.h"
+/* There is no API to purge all keys. For this test suite, require that
+ * all tests use a key id that gets purged here.
+ */
+void psa_purge_key_storage( void )
+{
+    psa_destroy_persistent_key( PERSISTENT_KEY_ID_1 );
+}
+#else /* ! MBEDTLS_PSA_CRYPTO_STORAGE_C */
+void psa_purge_key_storage( void )
+{
+}
+#endif /* ! MBEDTLS_PSA_CRYPTO_STORAGE_C */
+
+static int use_a_cipher_key( psa_key_id_t key_id, int existing, int destroy )
+{
+    int ok = 0;
+    /* Just do a smoke test to ensure that at least one algorithm works. */
+#if defined(MBEDTLS_AES_C) && defined(MBEDTLS_CIPHER_MODE_CTR)
+    static const uint8_t key[16] = "A nice AES key?";
+    static const uint8_t iv[16];
+    static const uint8_t msg[] = "Hello, world.";
+    uint8_t output[sizeof( msg )];
+    size_t output_length;
+    psa_key_handle_t handle;
+    psa_cipher_operation_t operation;
+
+    if( key_id != 0 && existing )
+    {
+#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
+        PSA_ASSERT( psa_open_key( PSA_KEY_LIFETIME_PERSISTENT, key_id,
+                                  &handle ) );
+#else
+        TEST_ASSERT( psa_open_key( PSA_KEY_LIFETIME_PERSISTENT, key_id,
+                                   &handle ) == PSA_ERROR_NOT_SUPPORTED );
+        ok = 1;
+        goto exit;
+#endif
+    }
+    else
+    {
+        psa_key_policy_t policy;
+        psa_key_policy_init( &policy );
+        psa_key_policy_set_usage( &policy, PSA_KEY_USAGE_ENCRYPT, PSA_ALG_CTR );
+        if( key_id != 0 )
+        {
+#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
+            PSA_ASSERT( psa_create_key( PSA_KEY_LIFETIME_PERSISTENT, key_id,
+                                        PSA_KEY_TYPE_AES,
+                                        PSA_BYTES_TO_BITS( sizeof( key ) ),
+                                        &handle ) );
+#else
+            TEST_ASSERT( psa_create_key( PSA_KEY_LIFETIME_PERSISTENT, key_id,
+                                         PSA_KEY_TYPE_AES,
+                                         PSA_BYTES_TO_BITS( sizeof( key ) ),
+                                         &handle ) == PSA_ERROR_NOT_SUPPORTED );
+            ok = 1;
+            goto exit;
+#endif
+        }
+        else
+        {
+            PSA_ASSERT( psa_allocate_key( PSA_KEY_TYPE_AES,
+                                          PSA_BYTES_TO_BITS( sizeof( key ) ),
+                                          &handle ) );
+        }
+        PSA_ASSERT( psa_set_key_policy( handle, &policy ) );
+        PSA_ASSERT( psa_import_key( handle, PSA_KEY_TYPE_AES,
+                                    key, sizeof( key ) ) );
+    }
+
+    PSA_ASSERT( psa_cipher_encrypt_setup( &operation, handle, PSA_ALG_CTR ) );
+    PSA_ASSERT( psa_cipher_set_iv( &operation, iv, sizeof( iv ) ) );
+    PSA_ASSERT( psa_cipher_update( &operation, msg, sizeof( msg ),
+                                   output, sizeof( output ),
+                                   &output_length ) );
+    PSA_ASSERT( psa_cipher_finish( &operation, NULL, 0, &output_length ) );
+
+    if( destroy )
+        PSA_ASSERT( psa_destroy_key( handle ) );
+    else
+        PSA_ASSERT( psa_close_key( handle ) );
+
+#endif /* defined(MBEDTLS_AES_C) && defined(MBEDTLS_CIPHER_MODE_CTR) */
+    ok = 1;
+exit:
+    return( ok );
+}
+
+static int use_a_volatile_key( void )
+{
+    return( use_a_cipher_key( 0, 0, 0 ) );
+}
+
+static int use_a_persistent_key( int existing, int destroy )
+{
+    return( use_a_cipher_key( PERSISTENT_KEY_ID_1, existing, destroy ) );
+}
+
+static int smoke_test_transparent_keys( int restart )
+{
+    if( ! use_a_volatile_key( ) )
+        return( 0 );
+    if( ! use_a_persistent_key( 0, 0 ) )
+        return( 0 );
+    if( restart )
+    {
+        mbedtls_psa_crypto_free( );
+        PSA_ASSERT( psa_crypto_init( ) );
+    }
+    return( use_a_persistent_key( 1, 1 ) );
+exit:
+    return( 0 );
+}
+
+/* END_HEADER */
+
+/* BEGIN_DEPENDENCIES
+ * depends_on:MBEDTLS_PSA_CRYPTO_C
+ * END_DEPENDENCIES
+ */
+
+/* BEGIN_CASE */
+void register_opaque( int lifetime, int version,
+                      int expected_status_arg )
+{
+    psa_status_t expected_status = expected_status_arg;
+    psa_drv_external_cryptoprocessor_t driver;
+
+    driver.model_version = version;
+    TEST_ASSERT( psa_crypto_drv_opaque_register( lifetime, &driver ) ==
+                 expected_status );
+
+    PSA_ASSERT( psa_crypto_init( ) );
+    if( ! smoke_test_transparent_keys( 1 ) )
+        goto exit;
+
+exit:
+    mbedtls_psa_crypto_free( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void register_opaque_4( int lifetime1, int status1,
+                        int lifetime2, int status2,
+                        int lifetime3, int status3,
+                        int lifetime4, int status4 )
+{
+    TEST_ASSERT(
+        psa_crypto_drv_opaque_register( lifetime1, &open_only_driver ) ==
+        status1 );
+    TEST_ASSERT(
+        psa_crypto_drv_opaque_register( lifetime2, &open_only_driver ) ==
+        status2 );
+    TEST_ASSERT(
+        psa_crypto_drv_opaque_register( lifetime3, &open_only_driver ) ==
+        status3 );
+    TEST_ASSERT(
+        psa_crypto_drv_opaque_register( lifetime4, &open_only_driver ) ==
+        status4 );
+
+    PSA_ASSERT( psa_crypto_init( ) );
+    if( ! smoke_test_transparent_keys( 1 ) )
+        goto exit;
+
+exit:
+    mbedtls_psa_crypto_free( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void register_opaque_many( int count )
+{
+    psa_key_lifetime_t lifetime;
+    psa_status_t status;
+
+    for( lifetime = 2; lifetime < (psa_key_lifetime_t) count + 2; lifetime++ )
+    {
+        status = psa_crypto_drv_opaque_register( lifetime, &open_only_driver );
+        if( status == PSA_ERROR_INSUFFICIENT_MEMORY )
+            goto full;
+        TEST_ASSERT( status == PSA_SUCCESS );
+    }
+    TEST_ASSERT( 0 );
+full:
+
+    PSA_ASSERT( psa_crypto_init( ) );
+    if( ! smoke_test_transparent_keys( 1 ) )
+        goto exit;
+
+exit:
+    mbedtls_psa_crypto_free( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void create_close_open( )
+{
+    psa_key_lifetime_t lifetime = 2;
+    psa_key_id_t key_id = 42;
+    psa_key_handle_t handle;
+
+    PSA_ASSERT( psa_crypto_drv_opaque_register( lifetime, &open_only_driver ) );
+    PSA_ASSERT( psa_crypto_init( ) );
+
+    ASSERT_WITH_DRIVER( psa_create_key( lifetime, key_id,
+                                        PSA_KEY_TYPE_RAW_DATA, 8,
+                                        &handle ),
+                        PSA_SUCCESS );
+    TEST_ASSERT( handle != 0 );
+    ASSERT_WITH_DRIVER( psa_close_key( handle ),
+                        PSA_SUCCESS );
+    ASSERT_WITH_DRIVER( psa_open_key( lifetime, key_id, &handle ),
+                        PSA_SUCCESS );
+    TEST_ASSERT( handle != 0 );
+    /* Don't close the key. When this test is running under a memory
+     * leak analyzer, this validates that the key gets closed from
+     * mbedtls_psa_crypto_free(). */
+
+exit:
+    mbedtls_psa_crypto_free( );
+    test_driver_purge( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void without_and_with_close( )
+{
+    psa_drv_external_cryptoprocessor_t driver;
+    psa_key_lifetime_t lifetime = 2;
+    psa_key_id_t key_id = 42;
+    psa_key_handle_t handle;
+
+    memset( &driver, 0, sizeof( driver ) );
+    driver.model_version = PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION;
+    PSA_ASSERT( psa_crypto_drv_opaque_register( lifetime, &driver ) );
+    /* This test cheats by modifying the method table between function
+     * invocations, but that's ok: our implementation supports it. */
+
+    PSA_ASSERT( psa_crypto_init( ) );
+
+    /* No open function, so create/open must fail. */
+    TEST_ASSERT( psa_create_key( lifetime, key_id,
+                                 PSA_KEY_TYPE_RAW_DATA, 8,
+                                 &handle ) ==
+                 PSA_ERROR_NOT_SUPPORTED );
+    TEST_ASSERT( psa_open_key( lifetime, key_id, &handle ) ==
+                 PSA_ERROR_NOT_SUPPORTED );
+
+    /* Create without close. */
+    driver.open = test_driver_open;
+    ASSERT_WITH_DRIVER( psa_create_key( lifetime, key_id,
+                                        PSA_KEY_TYPE_RAW_DATA, 8,
+                                        &handle ),
+                        PSA_SUCCESS );
+    PSA_ASSERT( psa_close_key( handle ) );
+    /* Since the close function wasn't invoked, free the context manually. */
+    mbedtls_free( test_driver_latest_opened_key );
+    test_driver_latest_opened_key = NULL;
+
+    /* Open without close. */
+    ASSERT_WITH_DRIVER( psa_open_key( lifetime, key_id, &handle ),
+                        PSA_SUCCESS );
+    PSA_ASSERT( psa_close_key( handle ) );
+    /* Since the close function wasn't invoked, free the context manually. */
+    mbedtls_free( test_driver_latest_opened_key );
+    test_driver_latest_opened_key = NULL;
+
+exit:
+    mbedtls_psa_crypto_free( );
+    test_driver_purge( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void without_and_with_destroy( )
+{
+    psa_drv_external_cryptoprocessor_t driver;
+    psa_key_lifetime_t lifetime = 2;
+    psa_key_id_t key_id = 42;
+    psa_key_handle_t handle;
+    psa_key_policy_t policy;
+
+    memset( &driver, 0, sizeof( driver ) );
+    driver.model_version = PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION;
+    driver.open = test_driver_open;
+    driver.close = test_driver_close;
+    PSA_ASSERT( psa_crypto_drv_opaque_register( lifetime, &driver ) );
+    PSA_ASSERT( psa_crypto_init( ) );
+    ASSERT_WITH_DRIVER( psa_create_key( lifetime, key_id,
+                                        PSA_KEY_TYPE_RAW_DATA, 8,
+                                        &handle ),
+                        PSA_SUCCESS );
+
+    /* No destroy method. */
+    TEST_ASSERT( psa_destroy_key( handle ) ==
+                 PSA_ERROR_NOT_SUPPORTED );
+    /* Although the destruction failed, the handle must have become invalid. */
+    TEST_ASSERT( psa_get_key_policy( handle, &policy ) ==
+                 PSA_ERROR_INVALID_HANDLE );
+
+    /* Now try with a destroy method. */
+    ASSERT_WITH_DRIVER( psa_open_key( lifetime, key_id, &handle ),
+                        PSA_SUCCESS );
+    driver.import_export.destroy = test_driver_destroy;
+    ASSERT_WITH_DRIVER( psa_destroy_key( handle ),
+                        PSA_SUCCESS );
+
+exit:
+    mbedtls_psa_crypto_free( );
+    test_driver_purge( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE */
+void without_and_with_import( )
+{
+    psa_drv_external_cryptoprocessor_t driver;
+    psa_key_lifetime_t lifetime = 2;
+    psa_key_id_t key_id = 42;
+    psa_key_handle_t handle;
+    const uint8_t key_material[13] = "This is a key";
+    size_t key_bits = PSA_BYTES_TO_BITS( sizeof( key_material ) );
+
+    memset( &driver, 0, sizeof( driver ) );
+    driver.model_version = PSA_DRV_OPAQUE_DRIVER_MODEL_VERSION;
+    driver.open = test_driver_open;
+    driver.close = test_driver_close;
+    PSA_ASSERT( psa_crypto_drv_opaque_register( lifetime, &driver ) );
+    PSA_ASSERT( psa_crypto_init( ) );
+    ASSERT_WITH_DRIVER( psa_create_key( lifetime, key_id,
+                                        PSA_KEY_TYPE_RAW_DATA, key_bits,
+                                        &handle ),
+                        PSA_SUCCESS );
+
+    /* No import method. */
+    TEST_ASSERT( psa_import_key( handle,
+                                 PSA_KEY_TYPE_RAW_DATA,
+                                 key_material, sizeof( key_material ) ) ==
+                 PSA_ERROR_NOT_SUPPORTED );
+
+    /* Try a valid import after the failed import. */
+    driver.import_export.import = test_driver_import;
+    ASSERT_WITH_DRIVER( psa_import_key( handle,
+                                        PSA_KEY_TYPE_RAW_DATA,
+                                        key_material, sizeof( key_material ) ),
+                        PSA_SUCCESS );
+
+exit:
+    mbedtls_psa_crypto_free( );
+    test_driver_purge( );
+}
+/* END_CASE */
