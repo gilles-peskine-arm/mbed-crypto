@@ -177,11 +177,11 @@ typedef struct data_tag
 #else
 /* On platforms where we don't know how to implement this check,
  * omit it. Oh well, a non-portable check is better than nothing. */
-#define STATIC_ASSERT_EXPR_IF_POSSIBLE( const_expr ) ( (void) 0 )
+#define IS_ARRAY_NOT_POINTER( arg ) 1
 #endif
 
 /* A compile-time constant with the value 0. If `const_expr` is not a
-   compile-time constant with a nonzero value, cause a compile-time error. */
+ * compile-time constant with a nonzero value, cause a compile-time error. */
 #define STATIC_ASSERT_EXPR( const_expr )                                \
     ( 0 && sizeof( struct { int STATIC_ASSERT : 1 - 2 * ! ( const_expr ); } ) )
 /* Return the scalar value `value` (possibly promoted). This is a compile-time
