@@ -1576,27 +1576,28 @@ psa_status_t psa_cipher_abort(psa_cipher_operation_t *operation);
  * \param alg                     The AEAD algorithm to compute
  *                                (\c PSA_ALG_XXX value such that
  *                                #PSA_ALG_IS_AEAD(\p alg) is true).
- * \param[in] nonce               Nonce or IV to use.
- * \param nonce_length            Size of the \p nonce buffer in bytes.
  * \param[in] additional_data     Additional data that will be authenticated
  *                                but not encrypted.
  * \param additional_data_length  Size of \p additional_data in bytes.
  * \param[in] plaintext           Data that will be authenticated and
  *                                encrypted.
  * \param plaintext_length        Size of \p plaintext in bytes.
- * \param[out] ciphertext         Output buffer for the authenticated and
- *                                encrypted data. The additional data is not
- *                                part of this output. For algorithms where the
- *                                encrypted data and the authentication tag
- *                                are defined as separate outputs, the
- *                                authentication tag is appended to the
- *                                encrypted data.
- * \param ciphertext_size         Size of the \p ciphertext buffer in bytes.
+ * \param[out] output             Output buffer containing the whole
+ *                                authenticated-encrypted message. This
+ *                                is the concatenation of:
+ *                                - A nonce of the default size for \p alg.
+ *                                - \p additional_data.
+ *                                - \p plaintext encrypted.
+ *                                - An authentication tag guaranteeing the
+ *                                  authenticity of the output. The value of
+ *                                  \p alg determines the tag length.
+ * \param output_size             Size of the \p output buffer in bytes.
  *                                This must be at least
  *                                #PSA_AEAD_ENCRYPT_OUTPUT_SIZE(\p alg,
+ *                                \p additional_data_length,
  *                                \p plaintext_length).
- * \param[out] ciphertext_length  On success, the size of the output
- *                                in the \b ciphertext buffer.
+ * \param[out] output_length      On success, the size of the data
+ *                                in the \b output buffer.
  *
  * \retval #PSA_SUCCESS
  *         Success.
@@ -1618,8 +1619,6 @@ psa_status_t psa_cipher_abort(psa_cipher_operation_t *operation);
  */
 psa_status_t psa_aead_encrypt(psa_key_handle_t handle,
                               psa_algorithm_t alg,
-                              const uint8_t *nonce,
-                              size_t nonce_length,
                               const uint8_t *additional_data,
                               size_t additional_data_length,
                               const uint8_t *plaintext,
@@ -1634,22 +1633,27 @@ psa_status_t psa_aead_encrypt(psa_key_handle_t handle,
  * \param alg                     The AEAD algorithm to compute
  *                                (\c PSA_ALG_XXX value such that
  *                                #PSA_ALG_IS_AEAD(\p alg) is true).
- * \param[in] nonce               Nonce or IV to use.
- * \param nonce_length            Size of the \p nonce buffer in bytes.
- * \param[in] additional_data     Additional data that has been authenticated
- *                                but not encrypted.
- * \param additional_data_length  Size of \p additional_data in bytes.
- * \param[in] ciphertext          Data that has been authenticated and
- *                                encrypted. For algorithms where the
- *                                encrypted data and the authentication tag
- *                                are defined as separate inputs, the buffer
- *                                must contain the encrypted data followed
- *                                by the authentication tag.
- * \param ciphertext_length       Size of \p ciphertext in bytes.
+ * \param[in] input               Input buffer containing the whole
+ *                                authenticated-encrypted message. This
+ *                                is the concatenation of:
+ *                                - A nonce of the default size for \p alg.
+ *                                - Additional data that is authenticated
+ *                                  but not encrypted.
+ *                                - Encrypted data.
+ *                                - An authentication tag guaranteeing the
+ *                                  authenticity of the output. The value of
+ *                                  \p alg determines the tag length.
+ * \param input_size              Size of the \p input buffer in bytes.
+ * \param additional_data_length  Size of the additional data in bytes.
+ * \param[out] additional_data    On success, `*additional_data` is a
+ *                                pointer into the \p input buffer which
+ *                                points to the beginning of the
+ *                                additional data.
  * \param[out] plaintext          Output buffer for the decrypted data.
  * \param plaintext_size          Size of the \p plaintext buffer in bytes.
  *                                This must be at least
  *                                #PSA_AEAD_DECRYPT_OUTPUT_SIZE(\p alg,
+ *                                \p additional_data_length,
  *                                \p ciphertext_length).
  * \param[out] plaintext_length   On success, the size of the output
  *                                in the \b plaintext buffer.
@@ -1676,12 +1680,10 @@ psa_status_t psa_aead_encrypt(psa_key_handle_t handle,
  */
 psa_status_t psa_aead_decrypt(psa_key_handle_t handle,
                               psa_algorithm_t alg,
-                              const uint8_t *nonce,
-                              size_t nonce_length,
-                              const uint8_t *additional_data,
+                              const uint8_t *input,
+                              size_t input_length,
                               size_t additional_data_length,
-                              const uint8_t *ciphertext,
-                              size_t ciphertext_length,
+                              const uint8_t **additional_data,
                               uint8_t *plaintext,
                               size_t plaintext_size,
                               size_t *plaintext_length);
