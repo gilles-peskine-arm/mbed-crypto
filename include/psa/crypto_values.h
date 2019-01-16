@@ -533,7 +533,6 @@
 #define PSA_ALG_CATEGORY_ASYMMETRIC_ENCRYPTION  ((psa_algorithm_t)0x12000000)
 #define PSA_ALG_CATEGORY_KEY_AGREEMENT          ((psa_algorithm_t)0x22000000)
 #define PSA_ALG_CATEGORY_KEY_DERIVATION         ((psa_algorithm_t)0x30000000)
-#define PSA_ALG_CATEGORY_KEY_SELECTION          ((psa_algorithm_t)0x31000000)
 
 #define PSA_ALG_IS_VENDOR_DEFINED(alg)                                  \
     (((alg) & PSA_ALG_VENDOR_FLAG) != 0)
@@ -605,7 +604,6 @@
 #define PSA_ALG_IS_ASYMMETRIC_ENCRYPTION(alg)                           \
     (((alg) & PSA_ALG_CATEGORY_MASK) == PSA_ALG_CATEGORY_ASYMMETRIC_ENCRYPTION)
 
-#define PSA_ALG_KEY_SELECTION_FLAG              ((psa_algorithm_t)0x01000000)
 /** Whether the specified algorithm is a key agreement algorithm.
  *
  * \param alg An algorithm identifier (value of type #psa_algorithm_t).
@@ -615,8 +613,7 @@
  *         algorithm identifier.
  */
 #define PSA_ALG_IS_KEY_AGREEMENT(alg)                                   \
-    (((alg) & PSA_ALG_CATEGORY_MASK & ~PSA_ALG_KEY_SELECTION_FLAG) ==   \
-     PSA_ALG_CATEGORY_KEY_AGREEMENT)
+    (((alg) & PSA_ALG_CATEGORY_MASK) == PSA_ALG_CATEGORY_KEY_AGREEMENT)
 
 /** Whether the specified algorithm is a key derivation algorithm.
  *
@@ -628,17 +625,6 @@
  */
 #define PSA_ALG_IS_KEY_DERIVATION(alg)                                  \
     (((alg) & PSA_ALG_CATEGORY_MASK) == PSA_ALG_CATEGORY_KEY_DERIVATION)
-
-/** Whether the specified algorithm is a key selection algorithm.
- *
- * \param alg An algorithm identifier (value of type #psa_algorithm_t).
- *
- * \return 1 if \p alg is a key selection algorithm, 0 otherwise.
- *         This macro may return either 0 or 1 if \p alg is not a supported
- *         algorithm identifier.
- */
-#define PSA_ALG_IS_KEY_SELECTION(alg)                                   \
-    (((alg) & PSA_ALG_CATEGORY_MASK) == PSA_ALG_CATEGORY_KEY_SELECTION)
 
 #define PSA_ALG_HASH_MASK                       ((psa_algorithm_t)0x000000ff)
 #define PSA_ALG_MD2                             ((psa_algorithm_t)0x01000001)
@@ -1210,53 +1196,15 @@
 
 #define PSA_ALG_KEY_DERIVATION_MASK             ((psa_algorithm_t)0x010fffff)
 
-/** Use a shared secret as is.
+/** The finite-field Diffie-Hellman (DH) key agreement algorithm.
  *
- * Specify this algorithm as the selection component of a key agreement
- * to use the raw result of the key agreement as key material.
- *
- * \warning The raw result of a key agreement algorithm such as finite-field
- * Diffie-Hellman or elliptic curve Diffie-Hellman has biases and should
- * not be used directly as key material. It can however be used as the secret
- * input in a key derivation algorithm.
- */
-#define PSA_ALG_SELECT_RAW                      ((psa_algorithm_t)0x31000001)
-
-#define PSA_ALG_KEY_AGREEMENT_GET_KDF(alg)                              \
-    (((alg) & PSA_ALG_KEY_DERIVATION_MASK) | PSA_ALG_CATEGORY_KEY_DERIVATION)
-
-#define PSA_ALG_KEY_AGREEMENT_GET_BASE(alg)                              \
-    ((alg) & ~PSA_ALG_KEY_DERIVATION_MASK)
-
-#define PSA_ALG_FFDH_BASE                       ((psa_algorithm_t)0x22100000)
-/** The Diffie-Hellman key agreement algorithm.
- *
- * This algorithm combines the finite-field Diffie-Hellman (DH) key
- * agreement, also known as Diffie-Hellman-Merkle (DHM) key agreement,
- * to produce a shared secret from a private key and the peer's
- * public key, with a key selection or key derivation algorithm to produce
- * one or more shared keys and other shared cryptographic material.
- *
- * The shared secret produced by key agreement and passed as input to the
- * derivation or selection algorithm \p kdf_alg is the shared secret
+ * The shared secret produced by key agreement is the shared secret
  * `g^{ab}` in big-endian format.
  * It is `ceiling(m / 8)` bytes long where `m` is the size of the prime `p`
  * in bits.
- *
- * \param kdf_alg       A key derivation algorithm (\c PSA_ALG_XXX value such
- *                      that #PSA_ALG_IS_KEY_DERIVATION(\p hash_alg) is true)
- *                      or a key selection algorithm (\c PSA_ALG_XXX value such
- *                      that #PSA_ALG_IS_KEY_SELECTION(\p hash_alg) is true).
- *
- * \return              The Diffie-Hellman algorithm with the specified
- *                      selection or derivation algorithm.
  */
-#define PSA_ALG_FFDH(kdf_alg) \
-    (PSA_ALG_FFDH_BASE | ((kdf_alg) & PSA_ALG_KEY_DERIVATION_MASK))
+#define PSA_ALG_FFDH                            ((psa_algorithm_t)0x22100000)
 /** Whether the specified algorithm is a finite field Diffie-Hellman algorithm.
- *
- * This includes every supported key selection or key agreement algorithm
- * for the output of the Diffie-Hellman calculation.
  *
  * \param alg An algorithm identifier (value of type #psa_algorithm_t).
  *
@@ -1264,19 +1212,11 @@
  *         This macro may return either 0 or 1 if \c alg is not a supported
  *         key agreement algorithm identifier.
  */
-#define PSA_ALG_IS_FFDH(alg) \
-    (PSA_ALG_KEY_AGREEMENT_GET_BASE(alg) == PSA_ALG_FFDH_BASE)
+#define PSA_ALG_IS_FFDH(alg) ((alg) == PSA_ALG_FFDH)
 
-#define PSA_ALG_ECDH_BASE                       ((psa_algorithm_t)0x22200000)
 /** The elliptic curve Diffie-Hellman (ECDH) key agreement algorithm.
  *
- * This algorithm combines the elliptic curve Diffie-Hellman key
- * agreement to produce a shared secret from a private key and the peer's
- * public key, with a key selection or key derivation algorithm to produce
- * one or more shared keys and other shared cryptographic material.
- *
- * The shared secret produced by key agreement and passed as input to the
- * derivation or selection algorithm \p kdf_alg is the x-coordinate of
+ * The shared secret produced by key agreement is the x-coordinate of
  * the shared secret point. It is always `ceiling(m / 8)` bytes long where
  * `m` is the bit size associated with the curve, i.e. the bit size of the
  * order of the curve's coordinate field. When `m` is not a multiple of 8,
@@ -1298,22 +1238,10 @@
  *   the shared secret is the x-coordinate of `d_A Q_B = d_B Q_A`
  *   in big-endian byte order.
  *   The bit size is `m` for the field `F_{2^m}`.
- *
- * \param kdf_alg       A key derivation algorithm (\c PSA_ALG_XXX value such
- *                      that #PSA_ALG_IS_KEY_DERIVATION(\p hash_alg) is true)
- *                      or a selection algorithm (\c PSA_ALG_XXX value such
- *                      that #PSA_ALG_IS_KEY_SELECTION(\p hash_alg) is true).
- *
- * \return              The Diffie-Hellman algorithm with the specified
- *                      selection or derivation algorithm.
  */
-#define PSA_ALG_ECDH(kdf_alg) \
-    (PSA_ALG_ECDH_BASE | ((kdf_alg) & PSA_ALG_KEY_DERIVATION_MASK))
+#define PSA_ALG_ECDH                            ((psa_algorithm_t)0x22200000)
 /** Whether the specified algorithm is an elliptic curve Diffie-Hellman
  * algorithm.
- *
- * This includes every supported key selection or key agreement algorithm
- * for the output of the Diffie-Hellman calculation.
  *
  * \param alg An algorithm identifier (value of type #psa_algorithm_t).
  *
@@ -1322,8 +1250,7 @@
  *         This macro may return either 0 or 1 if \c alg is not a supported
  *         key agreement algorithm identifier.
  */
-#define PSA_ALG_IS_ECDH(alg) \
-    (PSA_ALG_KEY_AGREEMENT_GET_BASE(alg) == PSA_ALG_ECDH_BASE)
+#define PSA_ALG_IS_ECDH(alg) ((alg) == PSA_ALG_ECDH)
 
 /**@}*/
 
