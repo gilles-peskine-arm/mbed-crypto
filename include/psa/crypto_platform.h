@@ -56,6 +56,24 @@ typedef uint32_t psa_app_key_id_t;
 /* When the library is built as part of a PSA Cryptography service on a
  * PSA platform, a key file ID encodes both the 32-bit key ID used by the
  * application and the signed 32-bit partition ID of the key owner. */
+#if 0
+typedef uint64_t psa_key_file_id_t;
+static inline psa_key_file_id_t psa_key_file_id( int32_t owner,
+                                                 psa_app_key_id_t key_id )
+{
+    uint32_t unsigned_owner = (uint32_t) owner;
+    return( (uint64_t) unsigned_owner << 32 | key_id );
+}
+static inline int32_t psa_key_get_owner( psa_key_file_id_t file_id )
+{
+    uint32_t unsigned_owner = file_id >> 32;
+    return( (int32_t) unsigned_owner );
+}
+static inline psa_app_key_id_t psa_key_get_id( psa_key_file_id_t file_id )
+{
+    return( file_id & 0xffffffff );
+}
+#else
 typedef struct
 {
     int32_t owner;
@@ -63,6 +81,7 @@ typedef struct
 } psa_key_file_id_t;
 typedef psa_key_file_id_t psa_key_id_t;
 #define PSA_KEY_FILE_GET_KEY_ID( file_id ) ( ( file_id ).key_id )
+#endif
 #else
 typedef uint32_t psa_key_file_id_t;
 #define PSA_KEY_FILE_GET_KEY_ID( key_id ) ( key_id )
