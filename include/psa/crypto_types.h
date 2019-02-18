@@ -85,7 +85,15 @@ typedef uint32_t psa_key_lifetime_t;
 
 /** Encoding of identifiers of persistent keys.
  */
+/* Mbed Crypto particularity: in an SPM integration, psa_key_id_t is a larger
+ * type that encodes both the application-supplied key identifier and the
+ * identity of the owner of the key. This non-compliant implementation is only
+ * used when building Mbed Crypto as a library inside the PSA Cryptography
+ * service. Applications that call the service see the standard API with a
+ * 32-bit type. */
+#if !defined(MBEDTLS_PSA_CRYPTO_SPM)
 typedef uint32_t psa_key_id_t;
+#endif
 
 /**@}*/
 
