@@ -63,7 +63,6 @@ typedef struct
 } psa_key_file_id_t;
 typedef psa_key_file_id_t psa_key_id_t;
 #define PSA_KEY_FILE_GET_KEY_ID( file_id ) ( ( file_id ).key_id )
-#endif
 #else
 typedef uint32_t psa_key_file_id_t;
 #define PSA_KEY_FILE_GET_KEY_ID( key_id ) ( key_id )
