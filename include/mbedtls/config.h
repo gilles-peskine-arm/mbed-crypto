@@ -1156,7 +1156,7 @@
  */
 //#define MBEDTLS_PSA_HAS_ITS_IO
 
-/** \def MBEDTLS_PSA_CRYPTO_KEY_FILE_ID_ENCODES_OWNER
+/* MBEDTLS_PSA_CRYPTO_KEY_FILE_ID_ENCODES_OWNER
  *
  * In PSA key storage, encode the owner of the key.
  *
