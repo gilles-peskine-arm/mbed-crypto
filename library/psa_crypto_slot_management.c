@@ -182,7 +182,6 @@ exit:
     psa_free_persistent_key_data( key_data, key_data_length );
     return( status );
 }
-#endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
 
 /** Check whether a key identifier is acceptable.
  *
@@ -207,6 +206,7 @@ static int psa_is_key_id_valid( psa_key_file_id_t file_id )
         return( 0 );
     return( 1 );
 }
+#endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
 
 /** Declare a slot as persistent and load it from storage.
  *
