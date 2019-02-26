@@ -2,10 +2,6 @@ set(libs
     mbedcrypto
 )
 
-if(ENABLE_ZLIB_SUPPORT)
-    set(libs ${libs} ${ZLIB_LIBRARIES})
-endif(ENABLE_ZLIB_SUPPORT)
-
 add_executable(selftest selftest.c)
 target_link_libraries(selftest ${libs})
 
