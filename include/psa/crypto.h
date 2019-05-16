@@ -614,10 +614,6 @@ psa_status_t psa_destroy_key(psa_key_handle_t handle);
  *       coefficient         INTEGER,  -- (inverse of q) mod p
  *   }
  *   ```
- * - For DSA private keys (#PSA_KEY_TYPE_DSA_KEYPAIR), the format is the
- *   representation of the private key `x` as a big-endian byte string. The
- *   length of the byte string is the private key size in bytes (leading zeroes
- *   are not stripped).
  * - For elliptic curve key pairs (key types for which
  *   #PSA_KEY_TYPE_IS_ECC_KEYPAIR is true), the format is
  *   a representation of the private value as a `ceiling(m/8)`-byte string
@@ -696,10 +692,6 @@ psa_status_t psa_export_key(psa_key_handle_t handle,
  *      - The byte 0x04;
  *      - `x_P` as a `ceiling(m/8)`-byte string, big-endian;
  *      - `y_P` as a `ceiling(m/8)`-byte string, big-endian.
- * - For DSA public keys (#PSA_KEY_TYPE_DSA_PUBLIC_KEY), the format is the
- *   representation of the public key `y = g^x mod p` as a big-endian byte
- *   string. The length of the byte string is the length of the base prime `p`
- *   in bytes.
  * - For Diffie-Hellman key exchange public keys (key types for which
  *   #PSA_KEY_TYPE_IS_DH_PUBLIC_KEY is true),
  *   the format is the representation of the public key `y = g^x mod p` as a
@@ -2945,8 +2937,7 @@ psa_status_t psa_generator_read(psa_crypto_generator_t *generator,
  *       and continue reading output from the generator to derive the other
  *       two keys).
  *     - Finite-field Diffie-Hellman keys (#PSA_KEY_TYPE_DH_KEYPAIR(\c group)
- *       where \c group designates a Diffie-Hellman group),
- *       DSA keys (#PSA_KEY_TYPE_DSA_KEYPAIR), and
+ *       where \c group designates a Diffie-Hellman group) and
  *       ECC keys on a Weierstrass elliptic curve
  *       (#PSA_KEY_TYPE_ECC_KEYPAIR(\c curve) where \c curve designates a
  *       Weierstrass curve).
@@ -2959,7 +2950,6 @@ psa_status_t psa_generator_read(psa_crypto_generator_t *generator,
  *       This method allows compliance to NIST standards, specifically
  *       the methods titled "key-pair generation by testing candidates"
  *       in NIST SP 800-56A &sect;5.6.1.1.4 for Diffie-Hellman,
- *       in FIPS 186-4 &sect;B.1.2 for DSA, and
  *       in NIST SP 800-56A &sect;5.6.1.2.2 or
  *       FIPS 186-4 &sect;B.4.2 for elliptic curve keys.
  *
