@@ -182,13 +182,14 @@ class MacroCollector:
     # and the expansion in group 3.
     _define_directive_re = re.compile(r'\s*#\s*define\s+(\w+)' +
                                       r'(?:\s+|\((\w+)\)\s*)' +
-                                      r'(.+)(?:/[*/])?')
+                                      r'(.+)')
 
     def read_line(self, line):
         m = re.match(self._define_directive_re, line)
         if not m:
             return
         name, parameter, expansion = m.groups()
+        expansion = re.sub(r'/\*.*?\*/|//.*', r' ', expansion)
         if name.endswith('_FLAG') or name.endswith('MASK'):
             # Macro only to build actual values
             return
@@ -238,6 +239,9 @@ class MacroCollector:
 
     def read_file(self, header_file):
         for line in header_file:
+            while line.endswith('\\\n'):
+                cont = header_file.next()
+                line = line[:-2] + cont
             self.read_line(line)
 
     def make_return_case(self, name):
