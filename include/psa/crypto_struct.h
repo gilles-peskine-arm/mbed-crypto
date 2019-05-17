@@ -224,6 +224,22 @@ static inline struct psa_crypto_generator_s psa_crypto_generator_init( void )
     return( v );
 }
 
+#define PSA_MAX_INTERMEDIATE_SECRET_SIZE 1024 // TODO: depends on MBEDTLS_DHM_C etc
+struct psa_intermediate_secret_s
+{
+    size_t length : sizeof( size_t ) * CHAR_BIT - 16;
+    unsigned whitened : 1;
+    unsigned reserved : 15;
+    uint8_t data[PSA_MAX_INTERMEDIATE_SECRET_SIZE];
+};
+
+#define PSA_INTERMEDIATE_SECRET_INIT {0, 0, 0, {0}}
+static inline struct psa_intermediate_secret_s psa_intermediate_secret_init( void )
+{
+    const struct psa_intermediate_secret_s v = PSA_INTERMEDIATE_SECRET_INIT;
+    return( v );
+}
+
 struct psa_key_policy_s
 {
     psa_key_usage_t usage;

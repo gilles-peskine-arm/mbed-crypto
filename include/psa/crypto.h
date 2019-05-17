@@ -2141,19 +2141,18 @@ psa_status_t psa_key_derivation(psa_crypto_generator_t *generator,
                                 size_t label_length,
                                 size_t capacity);
 
-/** Set up a key agreement operation.
+typedef struct psa_intermediate_secret_s psa_intermediate_secret_t;
+
+/** Perform a key agreement operation.
  *
  * A key agreement algorithm takes two inputs: a private key \p private_key
  * a public key \p peer_key.
- * The result of this function is a byte generator which can
- * be used to produce keys and other cryptographic material.
  *
- * The resulting generator always has the maximum capacity permitted by
- * the algorithm.
+ * The output is a shared secret which is placed in an intermediate secret
+ * object.
  *
- * \param[in,out] generator       The generator object to set up. It must have
- *                                been initialized as per the documentation for
- *                                #psa_crypto_generator_t and not yet in use.
+ * \param[in,out] intermediate    The intermediate object into which the
+ *                                result is to be stored. It must be empty.
  * \param private_key             Handle to the private key to use.
  * \param[in] peer_key            Public key of the peer. It must be
  *                                in the same format that psa_import_key()
@@ -2181,11 +2180,24 @@ psa_status_t psa_key_derivation(psa_crypto_generator_t *generator,
  * \retval #PSA_ERROR_HARDWARE_FAILURE
  * \retval #PSA_ERROR_TAMPERING_DETECTED
  */
-psa_status_t psa_key_agreement(psa_crypto_generator_t *generator,
+psa_status_t psa_key_agreement(psa_intermediate_secret_t *intermediate,
                                psa_key_handle_t private_key,
                                const uint8_t *peer_key,
                                size_t peer_key_length,
                                psa_algorithm_t alg);
+
+psa_status_t psa_intermediate_secret_abort(psa_intermediate_secret_t *intermediate);
+
+size_t psa_intermediate_secret_get_size(const psa_intermediate_secret_t *intermediate);
+
+psa_status_t psa_intermediate_secret_shrink(psa_intermediate_secret_t *intermediate,
+                                      size_t offset,
+                                      size_t size);
+
+psa_status_t psa_intermediate_secret_export(psa_intermediate_secret_t *intermediate,
+                                            uint8_t *output,
+                                            size_t output_size,
+                                            size_t *output_length);
 
 /**@}*/
 

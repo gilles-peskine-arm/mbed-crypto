@@ -3323,16 +3323,6 @@ psa_status_t psa_generator_abort( psa_crypto_generator_t *generator )
          * nothing to do. */
     }
     else
-    if( generator->alg == PSA_ALG_SELECT_RAW )
-    {
-        if( generator->ctx.buffer.data != NULL )
-        {
-            mbedtls_platform_zeroize( generator->ctx.buffer.data,
-                             generator->ctx.buffer.size );
-            mbedtls_free( generator->ctx.buffer.data );
-        }
-    }
-    else
 #if defined(MBEDTLS_MD_C)
     if( PSA_ALG_IS_HKDF( generator->alg ) )
     {
@@ -3620,23 +3610,6 @@ psa_status_t psa_generator_read( psa_crypto_generator_t *generator,
     }
     generator->capacity -= output_length;
 
-    if( generator->alg == PSA_ALG_SELECT_RAW )
-    {
-        /* Initially, the capacity of a selection generator is always
-         * the size of the buffer, i.e. `generator->ctx.buffer.size`,
-         * abbreviated in this comment as `size`. When the remaining
-         * capacity is `c`, the next bytes to serve start `c` bytes
-         * from the end of the buffer, i.e. `size - c` from the
-         * beginning of the buffer. Since `generator->capacity` was just
-         * decremented above, we need to serve the bytes from
-         * `size - generator->capacity - output_length` to
-         * `size - generator->capacity`. */
-        size_t offset =
-            generator->ctx.buffer.size - generator->capacity - output_length;
-        memcpy( output, generator->ctx.buffer.data + offset, output_length );
-        status = PSA_SUCCESS;
-    }
-    else
 #if defined(MBEDTLS_MD_C)
     if( PSA_ALG_IS_HKDF( generator->alg ) )
     {
@@ -3876,23 +3849,6 @@ static psa_status_t psa_key_derivation_internal(
     /* Set generator->alg even on failure so that abort knows what to do. */
     generator->alg = alg;
 
-    if( alg == PSA_ALG_SELECT_RAW )
-    {
-        (void) salt;
-        if( salt_length != 0 )
-            return( PSA_ERROR_INVALID_ARGUMENT );
-        (void) label;
-        if( label_length != 0 )
-            return( PSA_ERROR_INVALID_ARGUMENT );
-        generator->ctx.buffer.data = mbedtls_calloc( 1, secret_length );
-        if( generator->ctx.buffer.data == NULL )
-            return( PSA_ERROR_INSUFFICIENT_MEMORY );
-        memcpy( generator->ctx.buffer.data, secret, secret_length );
-        generator->ctx.buffer.size = secret_length;
-        max_capacity = secret_length;
-        status = PSA_SUCCESS;
-    }
-    else
 #if defined(MBEDTLS_MD_C)
     if( PSA_ALG_IS_HKDF( alg ) )
     {
@@ -4004,6 +3960,52 @@ psa_status_t psa_key_derivation( psa_crypto_generator_t *generator,
 /* Key agreement */
 /****************************************************************/
 
+psa_status_t psa_intermediate_secret_abort(
+    psa_intermediate_secret_t *intermediate )
+{
+    mbedtls_platform_zeroize( intermediate, sizeof( *intermediate ) );
+    return( PSA_SUCCESS );
+}
+
+size_t psa_intermediate_secret_get_size(
+    const psa_intermediate_secret_t *intermediate )
+{
+    return( intermediate->length );
+}
+
+psa_status_t psa_intermediate_secret_shrink(
+    psa_intermediate_secret_t *intermediate,
+    size_t offset,
+    size_t length )
+{
+    if( offset + length > offset /*overflow*/ ||
+        offset + length > intermediate->length )
+    {
+        psa_intermediate_secret_abort( intermediate );
+        return( PSA_ERROR_INVALID_ARGUMENT );
+    }
+    memmove( intermediate->data, intermediate->data + offset, length );
+    mbedtls_platform_zeroize( intermediate->data + length, offset );
+    intermediate->length = length;
+    return( PSA_SUCCESS );
+}
+
+psa_status_t psa_intermediate_secret_export(
+    psa_intermediate_secret_t *intermediate,
+    uint8_t *output,
+    size_t output_size,
+    size_t *output_length )
+{
+    if( intermediate->length > output_size )
+    {
+        *output_length = 0;
+        return( PSA_ERROR_BUFFER_TOO_SMALL );
+    }
+    memcpy( output, intermediate->data, intermediate->length );
+    *output_length = intermediate->length;
+    return( psa_intermediate_secret_abort( intermediate ) );
+}
+
 #if defined(MBEDTLS_ECDH_C)
 static psa_status_t psa_key_agreement_ecdh( const uint8_t *peer_key,
                                             size_t peer_key_length,
@@ -4060,31 +4062,28 @@ exit:
 
 #define PSA_KEY_AGREEMENT_MAX_SHARED_SECRET_SIZE MBEDTLS_ECP_MAX_BYTES
 
-/* Note that if this function fails, you must call psa_generator_abort()
- * to potentially free embedded data structures and wipe confidential data.
- */
-static psa_status_t psa_key_agreement_internal( psa_crypto_generator_t *generator,
+static psa_status_t psa_key_agreement_internal( psa_intermediate_secret_t *intermediate,
                                                 psa_key_slot_t *private_key,
                                                 const uint8_t *peer_key,
                                                 size_t peer_key_length,
                                                 psa_algorithm_t alg )
 {
     psa_status_t status;
-    uint8_t shared_secret[PSA_KEY_AGREEMENT_MAX_SHARED_SECRET_SIZE];
     size_t shared_secret_length = 0;
 
-    /* Step 1: run the secret agreement algorithm to generate the shared
-     * secret. */
-    switch( PSA_ALG_KEY_AGREEMENT_GET_BASE( alg ) )
+    if( intermediate->length != 0 )
+        return( PSA_ERROR_BAD_STATE );
+
+    switch( alg )
     {
 #if defined(MBEDTLS_ECDH_C)
-        case PSA_ALG_ECDH_BASE:
+        case PSA_ALG_ECDH:
             if( ! PSA_KEY_TYPE_IS_ECC_KEYPAIR( private_key->type ) )
                 return( PSA_ERROR_INVALID_ARGUMENT );
             status = psa_key_agreement_ecdh( peer_key, peer_key_length,
                                              private_key->data.ecp,
-                                             shared_secret,
-                                             sizeof( shared_secret ),
+                                             intermediate->data,
+                                             sizeof( intermediate->data ),
                                              &shared_secret_length );
             break;
 #endif /* MBEDTLS_ECDH_C */
@@ -4094,22 +4093,19 @@ static psa_status_t psa_key_agreement_internal( psa_crypto_generator_t *generato
             (void) peer_key_length;
             return( PSA_ERROR_NOT_SUPPORTED );
     }
-    if( status != PSA_SUCCESS )
-        goto exit;
 
-    /* Step 2: set up the key derivation to generate key material from
-     * the shared secret. */
-    status = psa_key_derivation_internal( generator,
-                                          shared_secret, shared_secret_length,
-                                          PSA_ALG_KEY_AGREEMENT_GET_KDF( alg ),
-                                          NULL, 0, NULL, 0,
-                                          PSA_GENERATOR_UNBRIDLED_CAPACITY );
-exit:
-    mbedtls_platform_zeroize( shared_secret, shared_secret_length );
+    if( status == PSA_SUCCESS )
+    {
+        intermediate->length = shared_secret_length;
+    }
+    else
+    {
+        psa_intermediate_secret_abort( intermediate );
+    }
     return( status );
 }
 
-psa_status_t psa_key_agreement( psa_crypto_generator_t *generator,
+psa_status_t psa_key_agreement( psa_intermediate_secret_t *intermediate,
                                 psa_key_handle_t private_key,
                                 const uint8_t *peer_key,
                                 size_t peer_key_length,
@@ -4123,12 +4119,10 @@ psa_status_t psa_key_agreement( psa_crypto_generator_t *generator,
                                     PSA_KEY_USAGE_DERIVE, alg );
     if( status != PSA_SUCCESS )
         return( status );
-    status = psa_key_agreement_internal( generator,
+    status = psa_key_agreement_internal( intermediate,
                                          slot,
                                          peer_key, peer_key_length,
                                          alg );
-    if( status != PSA_SUCCESS )
-        psa_generator_abort( generator );
     return( status );
 }
 
