@@ -146,6 +146,7 @@ where each argument takes each possible value at least once.'''
         'PSA_ERROR_OCCUPIED_SLOT',
         'PSA_ERROR_EMPTY_SLOT',
         'PSA_ERROR_INSUFFICIENT_CAPACITY',
+        'PSA_ERROR_TAMPERING_DETECTED',
     ])
     argument_split_re = re.compile(r' *, *')
     def parse_header_line(self, line):
