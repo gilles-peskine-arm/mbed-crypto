@@ -360,6 +360,24 @@ typedef enum
 }
 #endif
 
+#if defined(RECORD_PSA_STATUS_COVERAGE_LOG)
+#include <psa/crypto.h>
+#define STATUS_LOG_FILE_NAME "statuses.log"
+static psa_status_t record_status( psa_status_t status,
+                                   const char *func,
+                                   const char *file, int line,
+                                   const char *expr )
+{
+    static FILE *log;
+    if( log == NULL )
+        log = fopen( STATUS_LOG_FILE_NAME, "a" );
+    fprintf( log, "%d:%s:%s:%d:%s\n", (int) status, func, file, line, expr );
+    return( status );
+}
+#define RECORD_STATUS( function, expr )                         \
+    record_status( ( expr ), function, __FILE__, __LINE__, #expr )
+#include "instrument_record_status.h"
+#endif /* defined(RECORD_PSA_STATUS_COVERAGE_LOG) */
 
 /*----------------------------------------------------------------------------*/
 /* Global variables */
