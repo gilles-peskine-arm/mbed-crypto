@@ -110,7 +110,7 @@ void save_large_persistent_key( int data_too_large, int expected_status )
 
 exit:
     mbedtls_free( data );
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
     psa_destroy_persistent_key( key_id );
 }
 /* END_CASE */
@@ -147,7 +147,7 @@ void persistent_key_destroy( int key_id_arg, int should_store,
     TEST_EQUAL( handle, 0 );
 
     /* Shutdown and restart */
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
     PSA_ASSERT( psa_crypto_init() );
 
     /* Create another key in the same slot */
@@ -158,7 +158,7 @@ void persistent_key_destroy( int key_id_arg, int should_store,
                     second_data->x, second_data->len ) );
 
 exit:
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
     psa_destroy_persistent_key( key_id );
 }
 /* END_CASE */
@@ -190,7 +190,7 @@ void persistent_key_import( int key_id_arg, int type_arg, data_t *data,
 
 exit:
     psa_destroy_persistent_key( key_id );
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
 }
 /* END_CASE */
 
@@ -251,7 +251,7 @@ void import_export_persistent_key( data_t *data, int type_arg,
 
 exit:
     mbedtls_free( exported );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
     psa_destroy_persistent_key( key_id );
 }
 /* END_CASE */

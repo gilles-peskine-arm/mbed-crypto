@@ -1046,7 +1046,7 @@ void import( data_t *data, int type, int expected_status_arg )
         PSA_ASSERT( psa_destroy_key( handle ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1086,7 +1086,7 @@ void import_twice( int usage_arg, int alg_arg,
     }
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1122,7 +1122,7 @@ void import_rsa_made_up( int bits_arg, int keypair, int expected_status_arg )
 
 exit:
     mbedtls_free( buffer );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1226,7 +1226,7 @@ destroy:
 exit:
     mbedtls_free( exported );
     mbedtls_free( reexported );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1250,7 +1250,7 @@ void import_key_nonempty_slot( )
     TEST_EQUAL( status, PSA_ERROR_ALREADY_EXISTS );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1272,7 +1272,7 @@ void export_invalid_handle( int handle, int expected_export_status_arg )
     TEST_EQUAL( status, expected_export_status );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1300,7 +1300,7 @@ void export_with_no_key_activity( )
     TEST_EQUAL( status, PSA_ERROR_DOES_NOT_EXIST );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1324,7 +1324,7 @@ void cipher_with_no_key_activity( )
 
 exit:
     psa_cipher_abort( &operation );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1356,7 +1356,7 @@ void export_after_import_failure( data_t *data, int type_arg,
     TEST_EQUAL( status, PSA_ERROR_DOES_NOT_EXIST );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1385,7 +1385,7 @@ void cipher_after_import_failure( data_t *data, int type_arg,
 
 exit:
     psa_cipher_abort( &operation );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1426,7 +1426,7 @@ void export_after_destroy_key( data_t *data, int type_arg )
 
 exit:
     mbedtls_free( exported );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1478,7 +1478,7 @@ void import_export_public_key( data_t *data,
 exit:
     mbedtls_free( exported );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1521,7 +1521,7 @@ void import_and_exercise_key( data_t *data,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1557,7 +1557,7 @@ void key_policy( int usage_arg, int alg_arg )
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1627,7 +1627,7 @@ void mac_key_policy( int policy_usage,
 exit:
     psa_mac_abort( &operation );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1670,7 +1670,7 @@ void cipher_key_policy( int policy_usage,
 exit:
     psa_cipher_abort( &operation );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1731,7 +1731,7 @@ void aead_key_policy( int policy_usage,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1792,7 +1792,7 @@ void asymmetric_encryption_key_policy( int policy_usage,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
     mbedtls_free( buffer );
 }
 /* END_CASE */
@@ -1847,7 +1847,7 @@ void asymmetric_signature_key_policy( int policy_usage,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1886,7 +1886,7 @@ void derive_key_policy( int policy_usage,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1923,7 +1923,7 @@ void agreement_key_policy( int policy_usage,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -1960,7 +1960,7 @@ void key_policy_alg2( int key_type_arg, data_t *key_data,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2057,7 +2057,7 @@ void copy_key_policy( int source_usage_arg,
     PSA_ASSERT( psa_close_key( target_handle ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
     mbedtls_free( export_buffer );
 }
 /* END_CASE */
@@ -2137,7 +2137,7 @@ void copy_fail( int source_usage_arg, int source_alg_arg, int source_alg2_arg,
                 psa_key_policy_get_enrollment_algorithm( &target_policy ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2199,7 +2199,7 @@ void hash_setup( int alg_arg,
 #endif
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2287,7 +2287,7 @@ void hash_bad_order( )
     PSA_ASSERT( psa_hash_abort( &operation ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2322,7 +2322,7 @@ void hash_verify_bad_args( )
                 PSA_ERROR_INVALID_SIGNATURE );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2344,7 +2344,7 @@ void hash_finish_bad_args( )
                 PSA_ERROR_BUFFER_TOO_SMALL );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2389,7 +2389,7 @@ exit:
     psa_hash_abort( &op_setup );
     psa_hash_abort( &op_finished );
     psa_hash_abort( &op_aborted );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2430,7 +2430,7 @@ exit:
     psa_hash_abort( &op_setup );
     psa_hash_abort( &op_finished );
     psa_hash_abort( &op_aborted );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2501,7 +2501,7 @@ void mac_setup( int key_type_arg,
 #endif
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2625,7 +2625,7 @@ void mac_bad_order( )
     PSA_ASSERT( psa_mac_abort( &operation ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2681,7 +2681,7 @@ void mac_sign( int key_type_arg,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2720,7 +2720,7 @@ void mac_verify( int key_type_arg,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2798,7 +2798,7 @@ void cipher_setup( int key_type_arg,
 #endif
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -2951,7 +2951,7 @@ void cipher_bad_order( )
     PSA_ASSERT( psa_cipher_abort( &operation ) );
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3018,7 +3018,7 @@ void cipher_encrypt( int alg_arg, int key_type_arg,
 exit:
     mbedtls_free( output );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3093,7 +3093,7 @@ void cipher_encrypt_multipart( int alg_arg, int key_type_arg,
 exit:
     mbedtls_free( output );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3171,7 +3171,7 @@ void cipher_decrypt_multipart( int alg_arg, int key_type_arg,
 exit:
     mbedtls_free( output );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3239,7 +3239,7 @@ void cipher_decrypt( int alg_arg, int key_type_arg,
 exit:
     mbedtls_free( output );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3322,7 +3322,7 @@ exit:
     mbedtls_free( output1 );
     mbedtls_free( output2 );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3426,7 +3426,7 @@ exit:
     mbedtls_free( output1 );
     mbedtls_free( output2 );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3494,7 +3494,7 @@ exit:
     psa_destroy_key( handle );
     mbedtls_free( output_data );
     mbedtls_free( output_data2 );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3541,7 +3541,7 @@ void aead_encrypt( int key_type_arg, data_t *key_data,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( output_data );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3593,7 +3593,7 @@ void aead_decrypt( int key_type_arg, data_t *key_data,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( output_data );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3659,7 +3659,7 @@ void sign_deterministic( int key_type_arg, data_t *key_data,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( signature );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3704,7 +3704,7 @@ void sign_fail( int key_type_arg, data_t *key_data,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( signature );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3774,7 +3774,7 @@ void sign_verify( int key_type_arg, data_t *key_data,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( signature );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3806,7 +3806,7 @@ void asymmetric_verify( int key_type_arg, data_t *key_data,
                                        signature_data->len ) );
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3842,7 +3842,7 @@ void asymmetric_verify_fail( int key_type_arg, data_t *key_data,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3912,7 +3912,7 @@ void asymmetric_encrypt( int key_type_arg,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( output );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -3980,7 +3980,7 @@ exit:
     psa_destroy_key( handle );
     mbedtls_free( output );
     mbedtls_free( output2 );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4042,7 +4042,7 @@ void asymmetric_decrypt( int key_type_arg,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( output );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4104,7 +4104,7 @@ void asymmetric_decrypt_fail( int key_type_arg,
 exit:
     psa_destroy_key( handle );
     mbedtls_free( output );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4173,7 +4173,7 @@ void derive_setup( int key_type_arg,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4222,7 +4222,7 @@ void test_derive_invalid_generator_state( )
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4344,7 +4344,7 @@ exit:
     mbedtls_free( output_buffer );
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4407,7 +4407,7 @@ void derive_full( int alg_arg,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4471,7 +4471,7 @@ exit:
     psa_generator_abort( &generator );
     psa_destroy_key( base_handle );
     psa_destroy_key( derived_handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4555,7 +4555,7 @@ exit:
     psa_generator_abort( &generator );
     psa_destroy_key( base_handle );
     psa_destroy_key( derived_handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4589,7 +4589,7 @@ void key_agreement_setup( int alg_arg,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( our_key );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4641,7 +4641,7 @@ void key_agreement_capacity( int alg_arg,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( our_key );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4692,7 +4692,7 @@ void key_agreement_output( int alg_arg,
 exit:
     psa_generator_abort( &generator );
     psa_destroy_key( our_key );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
     mbedtls_free( actual_output );
 }
 /* END_CASE */
@@ -4742,7 +4742,7 @@ void generate_random( int bytes_arg )
     }
 
 exit:
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
     mbedtls_free( output );
     mbedtls_free( changed );
 }
@@ -4791,7 +4791,7 @@ void generate_key( int type_arg,
 
 exit:
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free( );
+    PSA_DONE( );
 }
 /* END_CASE */
 
@@ -4871,7 +4871,7 @@ void persistent_key_load_key_from_storage( data_t *data, int type_arg,
                 export_status );
 
     /* Shutdown and restart */
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
     PSA_ASSERT( psa_crypto_init() );
 
     /* Check key slot still contains key data */
@@ -4916,6 +4916,6 @@ exit:
     mbedtls_free( first_export );
     mbedtls_free( second_export );
     psa_destroy_key( handle );
-    mbedtls_psa_crypto_free();
+    PSA_DONE();
 }
 /* END_CASE */
