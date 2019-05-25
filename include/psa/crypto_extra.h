@@ -87,9 +87,9 @@ extern "C" {
  */
 static inline void psa_set_key_enrollment_algorithm(
     psa_key_attributes_t *attributes,
-    psa_algorithm_t alg)
+    psa_algorithm_t alg2)
 {
-    attributes->policy.alg2 = alg;
+    attributes->policy.alg2 = alg2;
 }
 
 /** Retrieve the enrollment algorithm policy from key attributes.
