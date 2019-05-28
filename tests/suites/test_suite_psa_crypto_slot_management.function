@@ -202,6 +202,7 @@ void persistent_slot_lifecycle( int lifetime_arg, int id_arg,
                                             &reexported_length ),
                             PSA_ERROR_NOT_PERMITTED );
             }
+            PSA_ASSERT( psa_close_key( handle ) );
             break;
         case CLOSE_BY_DESTROY:
             TEST_EQUAL( psa_open_key( lifetime, id, &handle ),
@@ -270,6 +271,8 @@ void create_existent( int lifetime_arg, int id_arg,
                                 &reexported_length ) );
     ASSERT_COMPARE( material1, sizeof( material1 ),
                     reexported, reexported_length );
+
+    PSA_ASSERT( psa_close_key( handle1 ) );
 
 exit:
     PSA_DONE( );
@@ -420,6 +423,8 @@ void copy_across_lifetimes( int source_lifetime_arg, int source_id_arg,
                         export_buffer, length );
     }
 
+    PSA_ASSERT( psa_destroy_key( target_handle ) );
+
 exit:
     PSA_DONE( );
     mbedtls_free( export_buffer );
@@ -483,6 +488,9 @@ void copy_from_empty( int source_lifetime_arg, int source_id_arg,
     PSA_ASSERT( psa_get_key_policy( target_handle, &got_policy ) );
     TEST_EQUAL( target_usage, psa_key_policy_get_usage( &got_policy ) );
     TEST_EQUAL( target_alg, psa_key_policy_get_algorithm( &got_policy ) );
+
+    PSA_ASSERT( psa_destroy_key( source_handle ) );
+    PSA_ASSERT( psa_destroy_key( target_handle ) );
 
 exit:
     PSA_DONE( );
@@ -572,6 +580,9 @@ void copy_to_occupied( int source_lifetime_arg, int source_id_arg,
                         export_buffer, length );
     }
 
+    PSA_ASSERT( psa_destroy_key( source_handle ) );
+    PSA_ASSERT( psa_destroy_key( target_handle ) );
+
 exit:
     PSA_DONE( );
     mbedtls_free( export_buffer );
@@ -636,6 +647,8 @@ void copy_to_same( int lifetime_arg, int id_arg,
         ASSERT_COMPARE( material->x, material->len,
                         export_buffer, length );
     }
+
+    PSA_ASSERT( psa_destroy_key( handle ) );
 
 exit:
     PSA_DONE( );
