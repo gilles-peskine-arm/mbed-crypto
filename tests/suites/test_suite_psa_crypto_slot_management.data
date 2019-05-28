@@ -1,10 +1,16 @@
 Transient slot, check after closing
 transient_slot_lifecycle:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_CLOSE
 
+Transient slot, check after closing and restarting
+transient_slot_lifecycle:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_CLOSE_WITH_SHUTDOWN
+
 Transient slot, check after destroying
 transient_slot_lifecycle:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_DESTROY
 
-Transient slot, check after restart
+Transient slot, check after destroying and restarting
+transient_slot_lifecycle:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_DESTROY_WITH_SHUTDOWN
+
+Transient slot, check after restart with live handles
 transient_slot_lifecycle:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_SHUTDOWN
 
 Persistent slot, check after closing
@@ -13,7 +19,13 @@ persistent_slot_lifecycle:PSA_KEY_LIFETIME_PERSISTENT:1:0:0:0:PSA_KEY_TYPE_RAW_D
 Persistent slot, check after destroying
 persistent_slot_lifecycle:PSA_KEY_LIFETIME_PERSISTENT:1:0:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_DESTROY
 
-Persistent slot, check after restart
+Persistent slot, check after closing and restarting
+persistent_slot_lifecycle:PSA_KEY_LIFETIME_PERSISTENT:1:0:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_CLOSE_WITH_SHUTDOWN
+
+Persistent slot, check after destroying and restarting
+persistent_slot_lifecycle:PSA_KEY_LIFETIME_PERSISTENT:1:0:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_DESTROY_WITH_SHUTDOWN
+
+Persistent slot, check after restart with live handles
 persistent_slot_lifecycle:PSA_KEY_LIFETIME_PERSISTENT:1:0:0:0:PSA_KEY_TYPE_RAW_DATA:"0123456789abcdef0123456789abcdef":CLOSE_BY_SHUTDOWN
 
 Persistent slot: ECP keypair (ECDSA, exportable); close
