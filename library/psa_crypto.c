@@ -2122,11 +2122,13 @@ static psa_status_t psa_hmac_abort_internal( psa_hmac_internal_data *hmac )
     return( psa_hash_abort( &hmac->hash_ctx ) );
 }
 
+#ifdef OLD_TLS12_PRF
 static void psa_hmac_init_internal( psa_hmac_internal_data *hmac )
 {
     /* Instances of psa_hash_operation_s can be initialized by zeroization. */
     memset( hmac, 0, sizeof( *hmac ) );
 }
+#endif
 #endif /* MBEDTLS_MD_C */
 
 psa_status_t psa_mac_abort( psa_mac_operation_t *operation )
@@ -3883,6 +3885,7 @@ psa_status_t psa_key_derivation_abort( psa_key_derivation_operation_t *operation
              /* TLS-1.2 PSK-to-MS KDF uses the same core as TLS-1.2 PRF */
              PSA_ALG_IS_TLS12_PSK_TO_MS( kdf_alg ) )
     {
+#ifdef OLD_TLS12_PRF
         if( operation->ctx.tls12_prf.key != NULL )
         {
             mbedtls_platform_zeroize( operation->ctx.tls12_prf.key,
@@ -3896,6 +3899,21 @@ psa_status_t psa_key_derivation_abort( psa_key_derivation_operation_t *operation
                              operation->ctx.tls12_prf.Ai_with_seed_len );
             mbedtls_free( operation->ctx.tls12_prf.Ai_with_seed );
         }
+#else
+        if( operation->ctx.tls12_prf.seed != NULL )
+        {
+            mbedtls_platform_zeroize( operation->ctx.tls12_prf.seed,
+                                      operation->ctx.tls12_prf.seed_length );
+            mbedtls_free( operation->ctx.tls12_prf.seed );
+        }
+        if( operation->ctx.tls12_prf.label != NULL )
+        {
+            mbedtls_platform_zeroize( operation->ctx.tls12_prf.label,
+                                      operation->ctx.tls12_prf.label_length );
+            mbedtls_free( operation->ctx.tls12_prf.label );
+        }
+        psa_hmac_abort_internal( &operation->ctx.tls12_prf.hmac );
+#endif
     }
     else
 #endif /* MBEDTLS_MD_C */
@@ -4009,8 +4027,10 @@ static psa_status_t psa_key_derivation_tls12_prf_generate_next_block(
     psa_hmac_internal_data hmac;
     psa_status_t status, cleanup_status;
 
+#ifdef OLD_TLS12_PRF
     unsigned char *Ai;
     size_t Ai_len;
+#endif
 
     /* We can't be wanting more output after block 0xff, otherwise
      * the capacity check in psa_key_derivation_output_bytes() would have
@@ -4024,6 +4044,7 @@ static psa_status_t psa_key_derivation_tls12_prf_generate_next_block(
     ++tls12_prf->block_number;
     tls12_prf->offset_in_block = 0;
 
+#ifdef OLD_TLS12_PRF
     /* Recall the definition of the TLS-1.2-PRF from RFC 5246:
      *
      * PRF(secret, label, seed) = P_<hash>(secret, label + seed)
@@ -4102,6 +4123,33 @@ static psa_status_t psa_key_derivation_tls12_prf_generate_next_block(
                                        hash_length );
     if( status != PSA_SUCCESS )
         goto cleanup;
+#else /* OLD_TLS12_PRF */
+
+    /* Calculate A(i) where i = tls12_prf->block_number. */
+    hmac = tls12_prf->hmac;
+    if( tls12_prf->block_number == 1 )
+        status = psa_hash_update( &hmac.hash_ctx, tls12_prf->seed, tls12_prf->seed_length );
+    else
+        status = psa_hash_update( &hmac.hash_ctx, tls12_prf->Ai, hash_length );
+    if( status != PSA_SUCCESS )
+        goto cleanup;
+    status = psa_hmac_finish_internal( &hmac, tls12_prf->Ai, hash_length );
+    if( status != PSA_SUCCESS )
+        goto cleanup;
+
+    /* Calculate HMAC(key, A(i) + seed + label). */
+    hmac = tls12_prf->hmac;
+    status = psa_hash_update( &hmac.hash_ctx, tls12_prf->Ai, hash_length );
+    if( status != PSA_SUCCESS )
+        goto cleanup;
+    status = psa_hash_update( &hmac.hash_ctx, tls12_prf->seed, tls12_prf->seed_length );
+    if( status != PSA_SUCCESS )
+        goto cleanup;
+    status = psa_hash_update( &hmac.hash_ctx, tls12_prf->label, tls12_prf->label_length );
+    if( status != PSA_SUCCESS )
+        goto cleanup;
+
+#endif /* OLD_TLS12_PRF */
 
 cleanup:
 
@@ -4111,6 +4159,7 @@ cleanup:
 
     return( status );
 }
+#endif /* OLD_TLS12_PRF */
 
 /* Read some bytes from an TLS-1.2-PRF-based operation.
  * See Section 5 of RFC 5246. */
@@ -4123,6 +4172,9 @@ static psa_status_t psa_key_derivation_tls12_prf_read(
     psa_algorithm_t hash_alg = PSA_ALG_TLS12_PRF_GET_HASH( alg );
     uint8_t hash_length = PSA_HASH_SIZE( hash_alg );
     psa_status_t status;
+
+    if( ! tls12_prf->seed_set || ! tls12_prf->key_set || ! tls12_prf->label_set )
+        return( PSA_ERROR_BAD_STATE );
 
     while( output_length != 0 )
     {
@@ -4362,6 +4414,7 @@ static psa_status_t psa_key_derivation_hkdf_setup( psa_hkdf_key_derivation_t *hk
  * Note that if this function fails, you must call psa_key_derivation_abort()
  * to potentially free embedded data structures and wipe confidential data.
  */
+#ifdef OLD_TLS12_PRF
 static psa_status_t psa_key_derivation_tls12_prf_setup(
     psa_tls12_prf_key_derivation_t *tls12_prf,
     const unsigned char *key,
@@ -4504,6 +4557,7 @@ static psa_status_t psa_key_derivation_internal(
                                                 salt, salt_length,
                                                 label, label_length );
     }
+#ifdef OLD_TLS12_PRF
     /* TLS-1.2 PRF and TLS-1.2 PSK-to-MS are very similar, so share code. */
     else if( PSA_ALG_IS_TLS12_PRF( alg ) ||
              PSA_ALG_IS_TLS12_PSK_TO_MS( alg ) )
@@ -4536,6 +4590,7 @@ static psa_status_t psa_key_derivation_internal(
                 label, label_length );
         }
     }
+#endif /* OLD_TLS12_PRF */
     else
 #endif
     {
@@ -4715,6 +4770,53 @@ static psa_status_t psa_hkdf_input( psa_hkdf_key_derivation_t *hkdf,
             return( PSA_ERROR_INVALID_ARGUMENT );
     }
 }
+
+static psa_status_t psa_tls12_prf_input( psa_tls12_prf_key_derivation_t *prf,
+                                         psa_algorithm_t hash_alg,
+                                         psa_key_derivation_step_t step,
+                                         const uint8_t *data,
+                                         size_t data_length )
+{
+    psa_status_t status;
+    switch( step )
+    {
+        case PSA_KEY_DERIVATION_INPUT_SEED:
+            if( prf->seed_set )
+                return( PSA_ERROR_BAD_STATE );
+            prf->seed_length = data_length;
+            if( data_length != 0 )
+            {
+                prf->seed = mbedtls_calloc( 1, data_length );
+                if( prf->seed == NULL )
+                    return( PSA_ERROR_INSUFFICIENT_MEMORY );
+                memcpy( prf->seed, data, data_length );
+            }
+            prf->seed_set = 1;
+            return( PSA_SUCCESS );
+        case PSA_KEY_DERIVATION_INPUT_SECRET:
+            status = psa_hmac_setup_internal( &prf->hmac, data, data_length,
+                                              hash_alg );
+            if( status != PSA_SUCCESS )
+                return( status );
+            prf->key_set = 1;
+            return( PSA_SUCCESS );
+        case PSA_KEY_DERIVATION_INPUT_LABEL:
+            if( prf->label_set )
+                return( PSA_ERROR_BAD_STATE );
+            prf->label_length = data_length;
+            if( data_length != 0 )
+            {
+                prf->label = mbedtls_calloc( 1, data_length );
+                if( prf->label == NULL )
+                    return( PSA_ERROR_INSUFFICIENT_MEMORY );
+                memcpy( prf->label, data, data_length );
+            }
+            prf->label_set = 1;
+            return( PSA_SUCCESS );
+        default:
+            return( PSA_ERROR_INVALID_ARGUMENT );
+    }
+}
 #endif /* MBEDTLS_MD_C */
 
 static psa_status_t psa_key_derivation_input_raw(
@@ -4753,8 +4855,9 @@ static psa_status_t psa_key_derivation_input_raw(
     if( PSA_ALG_IS_TLS12_PRF( kdf_alg ) ||
         PSA_ALG_IS_TLS12_PSK_TO_MS( kdf_alg ) )
     {
-        // To do: implement this
-        status = PSA_ERROR_NOT_SUPPORTED;
+        status = psa_tls12_prf_input( &operation->ctx.tls12_prf,
+                                      PSA_ALG_HKDF_GET_HASH( kdf_alg ),
+                                      step, data, data_length );
     }
     else
 #endif /* MBEDTLS_MD_C */

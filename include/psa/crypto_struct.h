@@ -194,6 +194,7 @@ typedef struct
 #if defined(MBEDTLS_MD_C)
 typedef struct psa_tls12_prf_key_derivation_s
 {
+#ifdef OLD_TLS12_PRF
     /* The TLS 1.2 PRF uses the key for each HMAC iteration,
      * hence we must store it for the lifetime of the operation.
      * This is different from HKDF, where the key is only used
@@ -204,6 +205,15 @@ typedef struct psa_tls12_prf_key_derivation_s
     /* `A(i) + seed` in the notation of RFC 5246, Sect. 5 */
     uint8_t *Ai_with_seed;
     size_t Ai_with_seed_len;
+
+#else
+    uint8_t *seed;
+    size_t seed_length;
+    uint8_t *label;
+    size_t label_length;
+    uint8_t Ai[PSA_HASH_MAX_SIZE];
+    psa_hmac_internal_data hmac;
+#endif
 
     /* `HMAC_hash( prk, A(i) + seed )` in the notation of RFC 5246, Sect. 5. */
     uint8_t output_block[PSA_HASH_MAX_SIZE];
@@ -219,6 +229,9 @@ typedef struct psa_tls12_prf_key_derivation_s
     /* The 1-based number of the block. */
     uint8_t block_number;
 
+    unsigned int key_set : 1;
+    unsigned int seed_set : 1;
+    unsigned int label_set : 1;
 } psa_tls12_prf_key_derivation_t;
 #endif /* MBEDTLS_MD_C */
 
