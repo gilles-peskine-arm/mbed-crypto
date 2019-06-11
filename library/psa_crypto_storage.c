@@ -394,6 +394,31 @@ exit:
 }
 
 #if defined(MBEDTLS_PSA_INJECT_ENTROPY)
+int mbedtls_platform_std_nv_seed_read( unsigned char *buf, size_t buf_len )
+{
+    psa_status_t status;
+    struct psa_storage_info_t info;
+    status = psa_its_get_info( PSA_CRYPTO_ITS_RANDOM_SEED_UID, &info );
+    if( status != PSA_SUCCESS )
+        return( -1 );
+    if( info.size < buf_len )
+        return( -1 );
+    status = psa_its_get( PSA_CRYPTO_ITS_RANDOM_SEED_UID,
+                          0, buf_len, buf );
+    if( status != PSA_SUCCESS )
+        return( -1 );
+    return( buf_len );
+}
+
+int mbedtls_platform_std_nv_seed_write( unsigned char *buf, size_t buf_len )
+{
+    psa_status_t status;
+    status = psa_its_set( PSA_CRYPTO_ITS_RANDOM_SEED_UID, buf_len, buf, 0 );
+    if( status != PSA_SUCCESS )
+        return( -1 );
+    return( buf_len );
+}
+
 psa_status_t mbedtls_psa_storage_inject_entropy( const unsigned char *seed,
                                                  size_t seed_size )
 {

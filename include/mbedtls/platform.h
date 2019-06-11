@@ -109,7 +109,7 @@ extern "C" {
 #if !defined(MBEDTLS_PLATFORM_STD_EXIT_FAILURE)
 #define MBEDTLS_PLATFORM_STD_EXIT_FAILURE  EXIT_FAILURE /**< The default exit value to use. */
 #endif
-#if defined(MBEDTLS_FS_IO)
+#if defined(MBEDTLS_FS_IO) && !defined(MBEDTLS_PSA_INJECT_ENTROPY)
 #if !defined(MBEDTLS_PLATFORM_STD_NV_SEED_READ)
 #define MBEDTLS_PLATFORM_STD_NV_SEED_READ   mbedtls_platform_std_nv_seed_read
 #endif
@@ -119,7 +119,7 @@ extern "C" {
 #if !defined(MBEDTLS_PLATFORM_STD_NV_SEED_FILE)
 #define MBEDTLS_PLATFORM_STD_NV_SEED_FILE   "seedfile"
 #endif
-#endif /* MBEDTLS_FS_IO */
+#endif /* MBEDTLS_FS_IO  && !MBEDTLS_PSA_INJECT_ENTROPY */
 #else /* MBEDTLS_PLATFORM_NO_STD_FUNCTIONS */
 #if defined(MBEDTLS_PLATFORM_STD_MEM_HDR)
 #include MBEDTLS_PLATFORM_STD_MEM_HDR
