@@ -15,6 +15,73 @@
 #define ENTROPY_MIN_NV_SEED_SIZE                                        \
     MAX(MBEDTLS_ENTROPY_MIN_PLATFORM, MBEDTLS_ENTROPY_BLOCK_SIZE)
 
+#if defined(MBEDTLS_PSA_INJECT_ENTROPY)
+#if defined(MBEDTLS_PSA_ITS_FILE_C)
+#include "psa_crypto_its.h"
+#else
+#include "psa/error.h"
+#include "psa/internal_trusted_storage.h"
+#endif
+
+#define NO_INJECTED_ENTROPY SIZE_MAX
+static size_t injected_entropy_size = NO_INJECTED_ENTROPY;
+static uint8_t injected_entropy[MBEDTLS_ENTROPY_MAX_SEED_SIZE];
+
+int backup_injected_entropy( void )
+{
+    psa_status_t status;
+    struct psa_storage_info_t info;
+    injected_entropy_size = NO_INJECTED_ENTROPY;
+    status = psa_its_get_info( PSA_CRYPTO_ITS_RANDOM_SEED_UID, &info );
+    switch( status )
+    {
+        case PSA_SUCCESS:
+            TEST_ASSERT( info.size <= sizeof( injected_entropy ) );
+            PSA_ASSERT( psa_its_get( PSA_CRYPTO_ITS_RANDOM_SEED_UID, 0,
+                                     info.size, injected_entropy ) );
+            injected_entropy_size = info.size;
+            return( 1 );
+        case PSA_ERROR_DOES_NOT_EXIST:
+            return( 1 );
+        default:
+            return( 0 );
+    }
+exit:
+    return( 0 );
+}
+
+int remove_injected_entropy( void )
+{
+    psa_status_t status;
+    status = psa_its_remove( PSA_CRYPTO_ITS_RANDOM_SEED_UID );
+    if( status == PSA_ERROR_DOES_NOT_EXIST )
+        status = PSA_SUCCESS;
+    PSA_ASSERT( status );
+exit:
+    return( status == PSA_SUCCESS );
+}
+
+int restore_injected_entropy( void )
+{
+    psa_status_t status;
+    if( injected_entropy_size == NO_INJECTED_ENTROPY )
+    {
+        status = psa_its_remove( PSA_CRYPTO_ITS_RANDOM_SEED_UID );
+        if( status == PSA_ERROR_DOES_NOT_EXIST )
+            status = PSA_SUCCESS;
+    }
+    else
+    {
+        status = psa_its_set( PSA_CRYPTO_ITS_RANDOM_SEED_UID,
+                              injected_entropy_size, injected_entropy, 0 );
+    }
+    if( ! test_info.failed )
+        PSA_ASSERT( status );
+exit:
+    return( status == PSA_SUCCESS );
+}
+#endif
+
 typedef struct
 {
     size_t threshold; /* Minimum bytes to make mbedtls_entropy_func happy */
@@ -43,6 +110,7 @@ static int fake_entropy_source( void *state_arg,
 #define ENTROPY_SOURCE_TIMING                   0x00000002
 #define ENTROPY_SOURCE_HAVEGE                   0x00000004
 #define ENTROPY_SOURCE_HARDWARE                 0x00000008
+#define ENTROPY_SOURCES_ALL_REAL                0x0000000f
 #define ENTROPY_SOURCE_NV_SEED                  0x00000010
 #define ENTROPY_SOURCE_FAKE                     0x40000000
 
@@ -280,5 +348,122 @@ void entropy_from_nv_seed( int seed_size_arg,
 exit:
     mbedtls_free( seed );
     mbedtls_psa_crypto_free( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE depends_on:MBEDTLS_PSA_INJECT_ENTROPY */
+void inject_entropy_not_done( int sources, int init_should_succeed )
+{
+    uint8_t seed[MBEDTLS_ENTROPY_MAX_SEED_SIZE];
+
+    memset( seed, 's', sizeof( seed ) );
+    if( ! backup_injected_entropy( ) )
+        goto exit;
+    if( ! remove_injected_entropy( ) )
+        goto exit;
+
+    PSA_ASSERT( mbedtls_psa_crypto_configure_entropy_sources(
+                    custom_entropy_init, mbedtls_entropy_free ) );
+    custom_entropy_sources_mask = (unsigned) sources;
+
+    if( init_should_succeed )
+    {
+        uint8_t random[9];
+        PSA_ASSERT( psa_crypto_init( ) );
+        PSA_ASSERT( psa_generate_random( random, sizeof( random ) ) );
+        /* Injection after init should fail. */
+        TEST_EQUAL( mbedtls_psa_inject_entropy( seed, sizeof( seed ) ),
+                    PSA_ERROR_NOT_PERMITTED );
+    }
+    else
+    {
+        TEST_EQUAL( psa_crypto_init( ), PSA_ERROR_INSUFFICIENT_ENTROPY );
+    }
+
+exit:
+    mbedtls_psa_crypto_free( );
+    restore_injected_entropy( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE depends_on:MBEDTLS_PSA_INJECT_ENTROPY */
+void inject_entropy_nominal( int sources, int init_should_succeed )
+{
+    uint8_t seed[MBEDTLS_ENTROPY_MAX_SEED_SIZE];
+
+    memset( seed, 's', sizeof( seed ) );
+    if( ! backup_injected_entropy( ) )
+        goto exit;
+    if( ! remove_injected_entropy( ) )
+        goto exit;
+
+    PSA_ASSERT( mbedtls_psa_crypto_configure_entropy_sources(
+                    custom_entropy_init, mbedtls_entropy_free ) );
+    custom_entropy_sources_mask = (unsigned) sources;
+
+    PSA_ASSERT( mbedtls_psa_inject_entropy( seed, sizeof( seed ) ) );
+
+    /* A second injection should always fail. */
+    TEST_EQUAL( mbedtls_psa_inject_entropy( seed, sizeof( seed ) ),
+                PSA_ERROR_NOT_PERMITTED );
+
+    if( init_should_succeed )
+    {
+        uint8_t random[9];
+        PSA_ASSERT( psa_crypto_init( ) );
+        PSA_ASSERT( psa_generate_random( random, sizeof( random ) ) );
+
+        /* Injection after init should fail. */
+        TEST_EQUAL( mbedtls_psa_inject_entropy( seed, sizeof( seed ) ),
+                    PSA_ERROR_NOT_PERMITTED );
+    }
+    else
+    {
+        TEST_EQUAL( psa_crypto_init( ), PSA_ERROR_INSUFFICIENT_ENTROPY );
+    }
+
+exit:
+    mbedtls_psa_crypto_free( );
+    restore_injected_entropy( );
+}
+/* END_CASE */
+
+/* BEGIN_CASE depends_on:MBEDTLS_PSA_INJECT_ENTROPY */
+void inject_entropy_fail( int seed_size_arg, int expected_inject_status_arg,
+                          int sources, int init_should_succeed )
+{
+    uint8_t seed[MBEDTLS_ENTROPY_MAX_SEED_SIZE + 1];
+    size_t seed_size = seed_size_arg;
+    psa_status_t expected_inject_status = expected_inject_status_arg;
+    psa_status_t status;
+
+    memset( seed, 's', sizeof( seed ) );
+    if( ! backup_injected_entropy( ) )
+        goto exit;
+    if( ! remove_injected_entropy( ) )
+        goto exit;
+
+    PSA_ASSERT( mbedtls_psa_crypto_configure_entropy_sources(
+                    custom_entropy_init, mbedtls_entropy_free ) );
+    custom_entropy_sources_mask = (unsigned) sources;
+
+    TEST_ASSERT( seed_size <= sizeof( seed ) );
+    status = mbedtls_psa_inject_entropy( seed, seed_size );
+    TEST_EQUAL( status, expected_inject_status );
+
+    if( init_should_succeed )
+    {
+        uint8_t random[9];
+        PSA_ASSERT( psa_crypto_init( ) );
+        PSA_ASSERT( psa_generate_random( random, sizeof( random ) ) );
+    }
+    else
+    {
+        TEST_EQUAL( psa_crypto_init( ), PSA_ERROR_INSUFFICIENT_ENTROPY );
+    }
+
+exit:
+    mbedtls_psa_crypto_free( );
+    restore_injected_entropy( );
 }
 /* END_CASE */

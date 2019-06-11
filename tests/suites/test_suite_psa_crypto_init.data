@@ -54,3 +54,69 @@ entropy_from_nv_seed:ENTROPY_MIN_NV_SEED_SIZE:PSA_SUCCESS
 
 Recreate NV seed file
 create_nv_seed:
+
+Entropy injection: not done, used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_not_done:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_PLATFORM:0
+
+Entropy injection: not done, used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_not_done:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_HARDWARE:0
+
+Entropy injection: not done, used, needed
+inject_entropy_not_done:ENTROPY_SOURCE_NV_SEED:0
+
+Entropy injection: not done, not used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_not_done:ENTROPY_SOURCE_PLATFORM:1
+
+Entropy injection: not done, not used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_not_done:ENTROPY_SOURCE_HARDWARE:1
+
+Entropy injection: not done, not used, needed
+inject_entropy_not_done:0:0
+
+Entropy injection: done, used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_nominal:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_PLATFORM:1
+
+Entropy injection: done, used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_nominal:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_HARDWARE:1
+
+Entropy injection: done, used, needed
+inject_entropy_nominal:ENTROPY_SOURCE_NV_SEED:1
+
+Entropy injection: done, not used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_nominal:ENTROPY_SOURCE_PLATFORM:1
+
+Entropy injection: done, not used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_nominal:ENTROPY_SOURCE_HARDWARE:1
+
+Entropy injection: done, not used, needed
+inject_entropy_nominal:0:0
+
+Entropy injection: fail (too small), used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_PLATFORM:0
+
+Entropy injection: fail (too small), used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:ENTROPY_SOURCE_NV_SEED | ENTROPY_SOURCE_HARDWARE:0
+
+Entropy injection: fail (too small), used, needed
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:ENTROPY_SOURCE_NV_SEED:0
+
+Entropy injection: fail (too small), not used, not needed (platform)
+depends_on:!MBEDTLS_NO_PLATFORM_ENTROPY
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:ENTROPY_SOURCE_PLATFORM:1
+
+Entropy injection: fail (too small), not used, not needed (hardware)
+depends_on:MBEDTLS_ENTROPY_HARDWARE_ALT
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:ENTROPY_SOURCE_HARDWARE:1
+
+Entropy injection: fail (too small), not used, needed
+inject_entropy_fail:15:PSA_ERROR_INVALID_ARGUMENT:0:0
