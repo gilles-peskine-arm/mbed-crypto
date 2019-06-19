@@ -67,7 +67,7 @@ static int test_helper_is_psa_pristine( int line, const char *file )
     }                                                             \
     while( 0 )
 
-static void test_helper_psa_done( int line, const char *file )
+void test_helper_psa_done( int line, const char *file )
 {
     (void) test_helper_is_psa_pristine( line, file );
     mbedtls_psa_crypto_free( );
