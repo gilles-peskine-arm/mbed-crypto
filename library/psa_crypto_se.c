@@ -27,6 +27,8 @@
 
 #if defined(MBEDTLS_PSA_CRYPTO_C)
 
+#include <string.h>
+
 #include "psa_crypto_se.h"
 
 typedef struct
@@ -35,7 +37,7 @@ typedef struct
     const psa_drv_se_t *methods;
 } method_table_entry_t;
 
-static method_table_entry_t drivers[PSA_MAX_SE_DRIVERS];
+static method_table_entry_t driver_table[PSA_MAX_SE_DRIVERS];
 
 psa_status_t psa_register_se_driver(
     psa_key_lifetime_t lifetime,
@@ -53,20 +55,25 @@ psa_status_t psa_register_se_driver(
 
     for( i = 0; i < PSA_MAX_SE_DRIVERS; i++ )
     {
-        if( drivers[i].lifetime == 0 )
+        if( driver_table[i].lifetime == 0 )
             break;
         /* Check that lifetime isn't already in use up to the first free
          * entry. Since entries are created in order and never deleted,
          * there can't be a used entry after the first free entry. */
-        if( drivers[i].lifetime == lifetime )
+        if( driver_table[i].lifetime == lifetime )
             return( PSA_ERROR_ALREADY_EXISTS );
     }
     if( i == PSA_MAX_SE_DRIVERS )
         return( PSA_ERROR_INSUFFICIENT_MEMORY );
 
-    drivers[i].lifetime = lifetime;
-    drivers[i].methods = methods;
+    driver_table[i].lifetime = lifetime;
+    driver_table[i].methods = methods;
     return( PSA_SUCCESS );
+}
+
+void psa_unregister_all_se_drivers( void )
+{
+    memset( driver_table, 0, sizeof( driver_table ) );
 }
 
 #endif /* MBEDTLS_PSA_CRYPTO_C */
