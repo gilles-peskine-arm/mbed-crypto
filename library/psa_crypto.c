@@ -29,6 +29,7 @@
 
 #include "psa_crypto_service_integration.h"
 #include "psa/crypto.h"
+#include "psa/crypto_se_driver.h"
 
 #include "psa_crypto_core.h"
 #include "psa_crypto_invasive.h"
@@ -923,10 +924,24 @@ psa_status_t psa_destroy_key( psa_key_handle_t handle )
     psa_key_slot_t *slot;
     psa_status_t status = PSA_SUCCESS;
     psa_status_t storage_status = PSA_SUCCESS;
+    psa_se_drv_table_entry_t *driver;
 
     status = psa_get_key_slot( handle, &slot );
     if( status != PSA_SUCCESS )
         return( status );
+
+    driver = psa_get_se_driver_entry( slot->lifetime );
+    if( driver != NULL )
+    {
+        const psa_drv_se_t *drv = psa_get_se_driver_methods( driver );
+        psa_key_slot_number_t slot_number = slot->data.se.slot_number;
+        if( drv->key_management == NULL ||
+            drv->key_management->p_destroy == NULL )
+            return( PSA_ERROR_NOT_PERMITTED );
+        status = drv->key_management->p_destroy( slot_number );
+        psa_update_se_slot_usage( driver, slot_number, 0 );
+    }
+
 #if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
     if( slot->lifetime == PSA_KEY_LIFETIME_PERSISTENT )
     {
@@ -934,6 +949,7 @@ psa_status_t psa_destroy_key( psa_key_handle_t handle )
             psa_destroy_persistent_key( slot->persistent_storage_id );
     }
 #endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
+
     status = psa_wipe_key_slot( slot );
     if( status != PSA_SUCCESS )
         return( status );
@@ -1106,10 +1122,24 @@ static psa_status_t psa_internal_export_key( const psa_key_slot_t *slot,
                                              size_t *data_length,
                                              int export_public_key )
 {
+    const psa_drv_se_t *drv = psa_get_se_driver( slot->lifetime );
+
     *data_length = 0;
 
     if( export_public_key && ! PSA_KEY_TYPE_IS_ASYMMETRIC( slot->type ) )
         return( PSA_ERROR_INVALID_ARGUMENT );
+
+    if( drv != NULL )
+    {
+        psa_drv_se_export_key_t method;
+        if( drv->key_management == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        method = ( export_public_key ?
+                   drv->key_management->p_export_public :
+                   drv->key_management->p_export );
+        return( ( *method )( slot->data.se.slot_number,
+                             data, data_size, data_length ) );
+    }
 
     if( key_type_is_raw_bytes( slot->type ) )
     {
@@ -1289,9 +1319,11 @@ static psa_status_t psa_set_key_policy_internal(
  * In case of failure at any step, stop the sequence and call
  * psa_fail_key_creation().
  *
- * \param attributes    Key attributes for the new key.
- * \param handle        On success, a handle for the allocated slot.
- * \param p_slot        On success, a pointer to the prepared slot.
+ * \param[in] attributes    Key attributes for the new key.
+ * \param[out] handle       On success, a handle for the allocated slot.
+ * \param[out] p_slot       On success, a pointer to the prepared slot.
+ * \param[out] p_drv        On any return, the driver for the key, if any.
+ *                          NULL for a transparent key.
  *
  * \retval #PSA_SUCCESS
  *         The key slot is ready to receive key material.
@@ -1301,10 +1333,13 @@ static psa_status_t psa_set_key_policy_internal(
 static psa_status_t psa_start_key_creation(
     const psa_key_attributes_t *attributes,
     psa_key_handle_t *handle,
-    psa_key_slot_t **p_slot )
+    psa_key_slot_t **p_slot,
+    psa_se_drv_table_entry_t **p_drv )
 {
     psa_status_t status;
     psa_key_slot_t *slot;
+
+    *p_drv = NULL;
 
     status = psa_internal_allocate_key_slot( handle, p_slot );
     if( status != PSA_SUCCESS )
@@ -1315,7 +1350,18 @@ static psa_status_t psa_start_key_creation(
     if( status != PSA_SUCCESS )
         return( status );
     slot->lifetime = attributes->lifetime;
-    if( attributes->lifetime != PSA_KEY_LIFETIME_VOLATILE )
+
+    *p_drv = psa_get_se_driver_entry( attributes->lifetime );
+    if( *p_drv != NULL )
+    {
+        /* Find a slot number. Don't yet mark it as allocated in case
+         * the key creation fails or there is a power failure. */
+        status = psa_find_se_slot_for_key( attributes, *p_drv,
+                                           &slot->data.se.slot_number );
+        if( status != PSA_SUCCESS )
+            return( status );
+    }
+    else if( attributes->lifetime != PSA_KEY_LIFETIME_VOLATILE )
     {
         status = psa_validate_persistent_key_parameters( attributes->lifetime,
                                                          attributes->id, 1 );
@@ -1336,14 +1382,17 @@ static psa_status_t psa_start_key_creation(
  * See the documentation of psa_start_key_creation() for the intended use
  * of this function.
  *
- * \param slot          Pointer to the slot with key material.
+ * \param[in,out] slot  Pointer to the slot with key material.
+ * \param[in] driver    The secure element driver for the key,
+ *                      or NULL for a transparent key.
  *
  * \retval #PSA_SUCCESS
  *         The key was successfully created. The handle is now valid.
  * \return If this function fails, the key slot is an invalid state.
  *         You must call psa_fail_key_creation() to wipe and free the slot.
  */
-static psa_status_t psa_finish_key_creation( psa_key_slot_t *slot )
+static psa_status_t psa_finish_key_creation( psa_key_slot_t *slot,
+                                             psa_se_drv_table_entry_t *driver )
 {
     psa_status_t status = PSA_SUCCESS;
     (void) slot;
@@ -1377,6 +1426,17 @@ static psa_status_t psa_finish_key_creation( psa_key_slot_t *slot )
     }
 #endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
 
+    if( driver != NULL )
+    {
+        status = psa_update_se_slot_usage( driver,
+                                           slot->data.se.slot_number, 1 );
+        if( status != PSA_SUCCESS )
+        {
+            psa_destroy_persistent_key( slot->persistent_storage_id );
+            return( status );
+        }
+    }
+
     return( status );
 }
 
@@ -1388,12 +1448,22 @@ static psa_status_t psa_finish_key_creation( psa_key_slot_t *slot )
  * See the documentation of psa_start_key_creation() for the intended use
  * of this function.
  *
- * \param slot          Pointer to the slot with key material.
+ * \param[in,out] slot  Pointer to the slot with key material.
+ * \param[in] driver    The secure element driver for the key,
+ *                      or NULL for a transparent key.
  */
-static void psa_fail_key_creation( psa_key_slot_t *slot )
+static void psa_fail_key_creation( psa_key_slot_t *slot,
+                                   psa_se_drv_table_entry_t *driver )
 {
     if( slot == NULL )
         return;
+
+    /* TOnogrepDO: If the key has already been created in the secure
+     * element, and the failure happened later (when saving metadata
+     * to internal storage), we need to destroy the key in the secure
+     * element. */
+    (void) driver;
+
     psa_wipe_key_slot( slot );
 }
 
@@ -1456,23 +1526,42 @@ psa_status_t psa_import_key( const psa_key_attributes_t *attributes,
 {
     psa_status_t status;
     psa_key_slot_t *slot = NULL;
+    psa_se_drv_table_entry_t *driver;
 
-    status = psa_start_key_creation( attributes, handle, &slot );
+    status = psa_start_key_creation( attributes, handle, &slot, &driver );
     if( status != PSA_SUCCESS )
         goto exit;
 
-    status = psa_import_key_into_slot( slot, data, data_length );
-    if( status != PSA_SUCCESS )
-        goto exit;
-    status = psa_check_key_slot_attributes( slot, attributes );
-    if( status != PSA_SUCCESS )
-        goto exit;
+    if( driver == NULL )
+    {
+        status = psa_import_key_into_slot( slot, data, data_length );
+        if( status != PSA_SUCCESS )
+            goto exit;
+        status = psa_check_key_slot_attributes( slot, attributes );
+        if( status != PSA_SUCCESS )
+            goto exit;
+    }
+    else
+    {
+        const psa_drv_se_t *drv = psa_get_se_driver_methods( driver );
+        if( drv->key_management == NULL ||
+            drv->key_management->p_import == NULL )
+        {
+            status = PSA_ERROR_NOT_SUPPORTED;
+            goto exit;
+        }
+        status = drv->key_management->p_import(
+            slot->data.se.slot_number,
+            slot->lifetime, slot->type, slot->policy.alg, slot->policy.usage,
+            data, data_length );
+        /* TOnogrepDO: psa_check_key_slot_attributes? */
+    }
 
-    status = psa_finish_key_creation( slot );
+    status = psa_finish_key_creation( slot, driver );
 exit:
     if( status != PSA_SUCCESS )
     {
-        psa_fail_key_creation( slot );
+        psa_fail_key_creation( slot, driver );
         *handle = 0;
     }
     return( status );
@@ -1512,6 +1601,7 @@ psa_status_t psa_copy_key( psa_key_handle_t source_handle,
     psa_key_slot_t *source_slot = NULL;
     psa_key_slot_t *target_slot = NULL;
     psa_key_attributes_t actual_attributes = *specified_attributes;
+    psa_se_drv_table_entry_t *driver;
 
     status = psa_get_key_from_slot( source_handle, &source_slot,
                                     PSA_KEY_USAGE_COPY, 0 );
@@ -1528,7 +1618,7 @@ psa_status_t psa_copy_key( psa_key_handle_t source_handle,
         goto exit;
 
     status = psa_start_key_creation( &actual_attributes,
-                                     target_handle, &target_slot );
+                                     target_handle, &target_slot, &driver );
     if( status != PSA_SUCCESS )
         goto exit;
 
@@ -1536,11 +1626,11 @@ psa_status_t psa_copy_key( psa_key_handle_t source_handle,
     if( status != PSA_SUCCESS )
         goto exit;
 
-    status = psa_finish_key_creation( target_slot );
+    status = psa_finish_key_creation( target_slot, driver );
 exit:
     if( status != PSA_SUCCESS )
     {
-        psa_fail_key_creation( target_slot );
+        psa_fail_key_creation( target_slot, driver );
         *target_handle = 0;
     }
     return( status );
@@ -4288,7 +4378,8 @@ psa_status_t psa_key_derivation_output_key( const psa_key_attributes_t *attribut
 {
     psa_status_t status;
     psa_key_slot_t *slot = NULL;
-    status = psa_start_key_creation( attributes, handle, &slot );
+    psa_se_drv_table_entry_t *driver;
+    status = psa_start_key_creation( attributes, handle, &slot, &driver );
     if( status == PSA_SUCCESS )
     {
         status = psa_generate_derived_key_internal( slot,
@@ -4296,10 +4387,10 @@ psa_status_t psa_key_derivation_output_key( const psa_key_attributes_t *attribut
                                                     operation );
     }
     if( status == PSA_SUCCESS )
-        status = psa_finish_key_creation( slot );
+        status = psa_finish_key_creation( slot, driver );
     if( status != PSA_SUCCESS )
     {
-        psa_fail_key_creation( slot );
+        psa_fail_key_creation( slot, driver );
         *handle = 0;
     }
     return( status );
@@ -5166,7 +5257,8 @@ psa_status_t psa_generate_key( const psa_key_attributes_t *attributes,
 {
     psa_status_t status;
     psa_key_slot_t *slot = NULL;
-    status = psa_start_key_creation( attributes, handle, &slot );
+    psa_se_drv_table_entry_t *driver;
+    status = psa_start_key_creation( attributes, handle, &slot, &driver );
     if( status == PSA_SUCCESS )
     {
         status = psa_generate_key_internal(
@@ -5174,10 +5266,10 @@ psa_status_t psa_generate_key( const psa_key_attributes_t *attributes,
             attributes->domain_parameters, attributes->domain_parameters_size );
     }
     if( status == PSA_SUCCESS )
-        status = psa_finish_key_creation( slot );
+        status = psa_finish_key_creation( slot, driver );
     if( status != PSA_SUCCESS )
     {
-        psa_fail_key_creation( slot );
+        psa_fail_key_creation( slot, driver );
         *handle = 0;
     }
     return( status );

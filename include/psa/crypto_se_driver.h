@@ -685,6 +685,44 @@ typedef struct {
  */
 /**@{*/
 
+/** \defgroup se_slot_usage Secure element slot usage mask
+ */
+/**@{*/
+
+/** The type of slot usage data for a driver.
+ *
+ * A driver can use this data to keep track of which slot numbers are in use
+ * and which are available for new keys. The core stores this data to
+ * internal persistent storage.
+ */
+typedef struct psa_drv_se_slot_usage_s psa_drv_se_slot_usage_t;
+
+psa_status_t psa_drv_cb_find_free_slot(
+    psa_drv_se_slot_usage_t *slot_usage,
+    psa_key_slot_number_t from,
+    psa_key_slot_number_t before,
+    psa_key_slot_number_t *found);
+
+/**@}*/
+
+/** \brief A function that allocates a slot number for a key.
+ *
+ * \param[in] attributes    Attributes of the key.
+ * \param[in] slot_usage    Slot usage data of the driver.
+ * \param[out] key_slot     Slot where the key will be stored.
+ *                          This must be a valid slot for a key of the
+ *                          chosen type. It must be unoccupied.
+ *
+ * \retval #PSA_SUCCESS
+ *         Success.
+ * \retval #PSA_ERROR_NOT_SUPPORTED
+ * \retval #PSA_ERROR_INSUFFICIENT_STORAGE
+ */
+typedef psa_status_t (*psa_drv_se_allocate_key_t)(
+    const psa_key_attributes_t *attributes,
+    const psa_drv_se_slot_usage_t *slot_usage,
+    psa_key_slot_number_t *key_slot);
+
 /** \brief A function that imports a key into a secure element in binary format
  *
  * This function can support any output from psa_export_key(). Refer to the
@@ -801,6 +839,8 @@ typedef psa_status_t (*psa_drv_se_generate_key_t)(psa_key_slot_number_t key_slot
                                                   size_t pubkey_out_size,
                                                   size_t *p_pubkey_length);
 
+#define PSA_SE_DRV_KEY_SLOT_NO_HARD_LIMIT ((psa_key_slot_number_t)0)
+
 /**
  * \brief A struct containing all of the function pointers needed to for secure
  * element key management
@@ -811,6 +851,11 @@ typedef psa_status_t (*psa_drv_se_generate_key_t)(psa_key_slot_number_t key_slot
  * If one of the functions is not implemented, it should be set to NULL.
  */
 typedef struct {
+    /** Number of slots, or #PSA_SE_DRV_KEY_SLOT_NO_HARD_LIMIT if there
+     * is no hard limit on the number of slots. */
+    psa_key_slot_number_t slot_count;
+    /** Function that allocates a slot number */
+    psa_drv_se_allocate_key_t   p_allocate;
     /** Function that performs a key import operation */
     psa_drv_se_import_key_t     p_import;
     /** Function that performs a generation */
@@ -980,12 +1025,12 @@ typedef struct {
      * Use #PSA_DRV_SE_HAL_VERSION.
      */
     uint32_t hal_version;
-    psa_drv_se_key_management_t key_management;
-    psa_drv_se_mac_t mac;
-    psa_drv_se_cipher_t cipher;
-    psa_drv_se_aead_t aead;
-    psa_drv_se_asymmetric_t asymmetric;
-    psa_drv_se_key_derivation_t derivation;
+    const psa_drv_se_key_management_t *key_management;
+    const psa_drv_se_mac_t *mac;
+    const psa_drv_se_cipher_t *cipher;
+    const psa_drv_se_aead_t *aead;
+    const psa_drv_se_asymmetric_t *asymmetric;
+    const psa_drv_se_key_derivation_t *derivation;
 } psa_drv_se_t;
 
 /** The current version of the opaque driver model.
