@@ -140,7 +140,7 @@ void mbedtls_psa_crypto_free( void );
  *         The library has already been initialized. It is no longer
  *         possible to call this function.
  */
-psa_status_t mbedtls_psa_inject_entropy(const unsigned char *seed,
+psa_status_t mbedtls_psa_inject_entropy(uint8_t *seed,
                                         size_t seed_size);
 
 /** Set up a key derivation operation.
