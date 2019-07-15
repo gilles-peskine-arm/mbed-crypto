@@ -32,3 +32,12 @@ key_creation_import_export:0
 
 Key creation smoke test (p_allocate allows 1 slot)
 key_creation_import_export:ARRAY_LENGTH( ram_slots ) - 1
+
+Key creation in a specific slot (0)
+key_creation_in_chosen_slot:0:PSA_SUCCESS
+
+Key creation in a specific slot (max)
+key_creation_in_chosen_slot:ARRAY_LENGTH( ram_slots ) - 1:PSA_SUCCESS
+
+Key creation in a specific slot (too large)
+key_creation_in_chosen_slot:ARRAY_LENGTH( ram_slots ):PSA_ERROR_INVALID_ARGUMENT

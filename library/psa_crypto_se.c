@@ -136,7 +136,6 @@ psa_status_t psa_find_se_slot_for_key(
     psa_key_slot_number_t *slot_number )
 {
     psa_status_t status;
-    psa_drv_se_allocate_key_t p_allocate = NULL;
 
     /* If the lifetime is wrong, it's a bug in the library. */
     if( driver->lifetime != attributes->lifetime )
@@ -145,21 +144,33 @@ psa_status_t psa_find_se_slot_for_key(
     /* If the driver doesn't support key creation in any way, give up now. */
     if( driver->methods->key_management == NULL )
         return( PSA_ERROR_NOT_SUPPORTED );
-    p_allocate = driver->methods->key_management->p_allocate;
 
-    /* Creating a key in a specific slot is not implemented yet. */
     if( attributes->has_slot_number )
-        return( PSA_ERROR_NOT_SUPPORTED );
+    {
+        psa_drv_se_check_key_slot_validity_t p_check_slot =
+            driver->methods->key_management->p_check_slot;
+        if( p_check_slot == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
+        *slot_number = psa_get_key_slot_number( attributes );
+        status = ( *p_check_slot )( &driver->context,
+                                    attributes,
+                                    *slot_number );
+    }
+    else
+    {
+        psa_drv_se_allocate_key_t p_allocate =
+            driver->methods->key_management->p_allocate;
 
-    /* If the driver doesn't tell us how to allocate a slot, that's
-     * not supported for the time being. */
-    if( p_allocate == NULL )
-        return( PSA_ERROR_NOT_SUPPORTED );
+        /* If the driver doesn't tell us how to allocate a slot, that's
+         * not supported for the time being. */
+        if( p_allocate == NULL )
+            return( PSA_ERROR_NOT_SUPPORTED );
 
-    status = ( *p_allocate )( &driver->context,
-                              driver->internal.persistent_data,
-                              attributes,
-                              slot_number );
+        status = ( *p_allocate )( &driver->context,
+                                  driver->internal.persistent_data,
+                                  attributes,
+                                  slot_number );
+    }
     return( status );
 }
 
