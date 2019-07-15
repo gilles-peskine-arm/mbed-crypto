@@ -122,6 +122,16 @@ typedef uint32_t psa_key_lifetime_t;
 typedef uint32_t psa_key_id_t;
 #endif
 
+#ifndef __DOXYGEN_ONLY__
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+/* Mbed Crypto defines this type here because it is available to applications
+ * through implementation-specific extensions. For the PSA Cryptography
+ * specification, this type is part of crypto_se_driver.h and documented
+ * in the secure element driver HAL, not in the API. */
+typedef uint64_t psa_key_slot_number_t;
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
+#endif /* !__DOXYGEN_ONLY__ */
+
 /**@}*/
 
 /** \defgroup policy Key policies

@@ -154,6 +154,60 @@ typedef struct mbedtls_psa_stats_s
  */
 void mbedtls_psa_get_stats( mbedtls_psa_stats_t *stats );
 
+/** \addtogroup key_lifetimes
+ * @{
+ */
+
+/** \brief Set the slot number for a key in a secure element.
+ *
+ * \param[out] attributes       The attribute structure to write to.
+ * \param slot_number           The slot in which the key will be placed.
+ *
+ * \note If the key is not located in a secure element (as determined
+ *       by its lifetime), this value is ignored.
+ *
+ * \note If the key is located in a secure element but the choice of
+ *       slot number is not valid or not possible, this is detected
+ *       when the key is created. Choosing a slot number can cause
+ *       the key slot creation function (psa_import_key(),
+ *       psa_generate_key(), psa_key_derivation_output_key() or
+ *       psa_copy_key()) to return the following errors:
+ *
+ *       - #PSA_ERROR_NOT_PERMITTED if the calling application is not
+ *         permitted to choose this particular slot number, or if
+ *         it is not permitted to choose the slot number at all.
+ *       - #PSA_ERROR_NOT_SUPPORTED if the driver does not support
+ *         choosing a slot number.
+ *       - #PSA_ERROR_INVALID_ARGUMENT if the specified slot number
+ *         is not valid.
+ *       - #PSA_ERROR_ALREADY_EXISTS if there is already a key
+ *         with the specified slot number.
+ */
+static inline void psa_set_key_slot_number(
+    psa_key_attributes_t *attributes,
+    psa_key_slot_number_t slot_number)
+{
+    attributes->slot_number = slot_number;
+    attributes->has_slot_number = 1;
+}
+
+/** Retrieve the enrollment algorithm policy from key attributes.
+ *
+ * \param[in] attributes        The key attribute structure to query.
+ *
+ * \return The slot containing the specified key.
+ *         If the key is not in a secure element,
+ *         or if the caller is not permitted to observe slot numbers,
+ *         the value is unspecified.
+ */
+static inline psa_key_slot_number_t psa_get_key_slot_number(
+    const psa_key_attributes_t *attributes)
+{
+    return( attributes->slot_number );
+}
+
+/**@}*/
+
 /**
  * \brief Inject an initial entropy seed for the random generator into
  *        secure storage.

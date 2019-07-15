@@ -309,18 +309,45 @@ static inline struct psa_key_policy_s psa_key_policy_init( void )
     return( v );
 }
 
+/* Store the key size in a smaller field to save RAM. */
+typedef uint16_t mbedtls_psa_key_attributes_bits_t;
+#define MBEDTLS_PSA_MAX_KEY_BITS ( (mbedtls_psa_key_attributes_bits_t)( -1 ) )
+
 struct psa_key_attributes_s
 {
     psa_key_id_t id;
     psa_key_lifetime_t lifetime;
     psa_key_policy_t policy;
     psa_key_type_t type;
-    size_t bits;
+    mbedtls_psa_key_attributes_bits_t bits;
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+    unsigned has_slot_number : 1;
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
     void *domain_parameters;
     size_t domain_parameters_size;
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+    psa_key_slot_number_t slot_number;
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 };
 
-#define PSA_KEY_ATTRIBUTES_INIT {0, 0, {0, 0, 0}, 0, 0, NULL, 0}
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+#define MBEDTLS_FIELD_IF_HAS_PSA_CRYPTO_SE_C( x ) x,
+#else
+#define MBEDTLS_FIELD_IF_HAS_PSA_CRYPTO_SE_C /*empty*/
+#endif
+
+#define PSA_KEY_ATTRIBUTES_INIT         \
+    {                                   \
+        .id = 0,                        \
+        .lifetime = 0,                  \
+        .policy = {0, 0, 0},            \
+        .type = 0,                      \
+        .bits = 0,                      \
+        MBEDTLS_FIELD_IF_HAS_PSA_CRYPTO_SE_C( .has_slot_number = 0 ) \
+        .domain_parameters = NULL,      \
+        .domain_parameters_size = 0,    \
+        MBEDTLS_FIELD_IF_HAS_PSA_CRYPTO_SE_C( .slot_number = 0 ) \
+    }
 static inline struct psa_key_attributes_s psa_key_attributes_init( void )
 {
     const struct psa_key_attributes_s v = PSA_KEY_ATTRIBUTES_INIT;
@@ -413,7 +440,13 @@ static inline psa_key_type_t psa_get_key_type(
 static inline void psa_set_key_bits(psa_key_attributes_t *attributes,
                                     size_t bits)
 {
-    attributes->bits = bits;
+    /* This implementation stores a key's bit size in a field that's
+     * smaller than size_t. Make sure not to overflow. Saturate at a size
+     * that's larger than the largest supported key. */
+    if( bits > MBEDTLS_PSA_MAX_KEY_BITS )
+        attributes->bits = MBEDTLS_PSA_MAX_KEY_BITS;
+    else
+        attributes->bits = bits;
 }
 
 static inline size_t psa_get_key_bits(
