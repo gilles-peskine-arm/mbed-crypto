@@ -206,6 +206,10 @@ psa_status_t psa_find_se_slot_for_key(
         return( PSA_ERROR_NOT_SUPPORTED );
     p_allocate = driver->methods->key_management->p_allocate;
 
+    /* Creating a key in a specific slot is not implemented yet. */
+    if( attributes->has_slot_number )
+        return( PSA_ERROR_NOT_SUPPORTED );
+
     /* If the driver doesn't tell us how to allocate a slot, that's
      * not supported for the time being. */
     if( p_allocate == NULL )
