@@ -550,7 +550,7 @@
  * status = psa_get_key_information(key, &key_type, &key_bits);
  * if (status != PSA_SUCCESS) handle_error(...);
  * size_t buffer_size = PSA_KEY_EXPORT_MAX_SIZE(key_type, key_bits);
- * unsigned char *buffer = malloc(buffer_size);
+ * uint8_t *buffer = malloc(buffer_size);
  * if (buffer != NULL) handle_error(...);
  * size_t buffer_length;
  * status = psa_export_key(key, buffer, buffer_size, &buffer_length);
@@ -568,7 +568,7 @@
  * if (status != PSA_SUCCESS) handle_error(...);
  * psa_key_type_t public_key_type = PSA_KEY_TYPE_PUBLIC_KEY_OF_KEYPAIR(key_type);
  * size_t buffer_size = PSA_KEY_EXPORT_MAX_SIZE(public_key_type, key_bits);
- * unsigned char *buffer = malloc(buffer_size);
+ * uint8_t *buffer = malloc(buffer_size);
  * if (buffer != NULL) handle_error(...);
  * size_t buffer_length;
  * status = psa_export_public_key(key, buffer, buffer_size, &buffer_length);
