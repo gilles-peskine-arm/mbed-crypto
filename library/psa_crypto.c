@@ -1423,6 +1423,7 @@ typedef enum
     PSA_KEY_CREATION_GENERATE,
     PSA_KEY_CREATION_DERIVE,
     PSA_KEY_CREATION_COPY,
+    PSA_KEY_CREATION_REGISTER,
 } psa_key_creation_method_t;
 
 /** Prepare a key slot to receive key material.
@@ -1491,10 +1492,13 @@ static psa_status_t psa_start_key_creation(
      * we can roll back to a state where the key doesn't exist. */
     if( *p_drv != NULL )
     {
-        status = psa_find_se_slot_for_key( attributes, *p_drv,
-                                           &slot->data.se.slot_number );
-        if( status != PSA_SUCCESS )
-            return( status );
+        if( method != PSA_KEY_CREATION_REGISTER )
+        {
+            status = psa_find_se_slot_for_key( attributes, *p_drv,
+                                               &slot->data.se.slot_number );
+            if( status != PSA_SUCCESS )
+                return( status );
+        }
 
         /* TOnogrepDO: validate bits. How to do this depends on the key
          * creation method, so setting bits might not belong here. */
@@ -1735,6 +1739,51 @@ exit:
     }
     return( status );
 }
+
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+psa_status_t mbedtls_psa_register_se_key(
+    const psa_key_attributes_t *attributes )
+{
+    psa_status_t status;
+    psa_key_slot_t *slot = NULL;
+    psa_se_drv_table_entry_t *driver = NULL;
+    psa_key_handle_t handle = 0;
+
+    if( ! attributes->has_slot_number )
+    {
+        return( PSA_ERROR_INVALID_ARGUMENT );
+    }
+
+    status = psa_start_key_creation( PSA_KEY_CREATION_REGISTER, attributes,
+                                     &handle, &slot, &driver );
+    if( status != PSA_SUCCESS )
+        goto exit;
+
+    if( driver == NULL )
+    {
+        status = PSA_ERROR_INVALID_ARGUMENT;
+        goto exit;
+    }
+
+    /* For the time being, there are no checks. Just accept the
+     * slot number as valid. */
+    slot->data.se.slot_number = psa_get_key_slot_number( attributes );
+
+    status = psa_check_key_slot_attributes( slot, attributes );
+    if( status != PSA_SUCCESS )
+        goto exit;
+
+    status = psa_finish_key_creation( slot, driver );
+exit:
+    if( status != PSA_SUCCESS )
+    {
+        psa_fail_key_creation( slot, driver );
+    }
+    /* Registration doesn't keep the key in RAM. */
+    psa_close_key( handle );
+    return( status );
+}
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 
 static psa_status_t psa_copy_key_material( const psa_key_slot_t *source,
                                            psa_key_slot_t *target )
