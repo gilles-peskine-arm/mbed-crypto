@@ -41,3 +41,15 @@ key_creation_in_chosen_slot:ARRAY_LENGTH( ram_slots ) - 1:PSA_SUCCESS
 
 Key creation in a specific slot (too large)
 key_creation_in_chosen_slot:ARRAY_LENGTH( ram_slots ):PSA_ERROR_INVALID_ARGUMENT
+
+Key registration: smoke test
+register_key_smoke_test:MIN_DRIVER_LIFETIME:PSA_SUCCESS
+
+Key registration: invalid lifetime (volatile)
+register_key_smoke_test:PSA_KEY_LIFETIME_VOLATILE:PSA_ERROR_INVALID_ARGUMENT
+
+Key registration: invalid lifetime (internal storage)
+register_key_smoke_test:PSA_KEY_LIFETIME_PERSISTENT:PSA_ERROR_INVALID_ARGUMENT
+
+Key registration: invalid lifetime (no registered driver)
+register_key_smoke_test:MIN_DRIVER_LIFETIME + 1:PSA_ERROR_INVALID_ARGUMENT
