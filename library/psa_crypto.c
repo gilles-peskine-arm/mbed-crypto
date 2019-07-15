@@ -1080,6 +1080,9 @@ psa_status_t psa_get_key_attributes( psa_key_handle_t handle,
 {
     psa_key_slot_t *slot;
     psa_status_t status;
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+    const psa_drv_se_t *drv;
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 
     psa_reset_key_attributes( attributes );
 
@@ -1092,6 +1095,13 @@ psa_status_t psa_get_key_attributes( psa_key_handle_t handle,
     attributes->policy = slot->policy;
     attributes->type = slot->type;
     attributes->bits = psa_get_key_slot_bits( slot );
+
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
+    if( psa_get_se_driver( slot->lifetime, &drv, NULL ) )
+    {
+        attributes->slot_number = slot->data.se.slot_number;
+    }
+#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 
     switch( slot->type )
     {
