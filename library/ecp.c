@@ -1025,6 +1025,8 @@ int mbedtls_ecp_tls_write_group( const mbedtls_ecp_group *grp, size_t *olen,
  * See the documentation of struct mbedtls_ecp_group.
  *
  * This function is in the critial loop for mbedtls_ecp_mul, so pay attention to perf.
+ *
+ * This function assumes that 0 <= N < P^2.
  */
 static int ecp_modp( mbedtls_mpi *N, const mbedtls_ecp_group *grp )
 {
@@ -1032,13 +1034,6 @@ static int ecp_modp( mbedtls_mpi *N, const mbedtls_ecp_group *grp )
 
     if( grp->modp == NULL )
         return( mbedtls_mpi_mod_mpi( N, N, &grp->P ) );
-
-    /* N->s < 0 is a much faster test, which fails only if N is 0 */
-    if( ( N->s < 0 && mbedtls_mpi_cmp_int( N, 0 ) != 0 ) ||
-        mbedtls_mpi_bitlen( N ) > 2 * grp->pbits )
-    {
-        return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
-    }
 
     MBEDTLS_MPI_CHK( grp->modp( N ) );
 
