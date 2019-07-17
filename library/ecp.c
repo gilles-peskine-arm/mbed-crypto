@@ -1080,13 +1080,28 @@ cleanup:
         INC_MUL_COUNT                                                   \
     } while( 0 )
 
-/*
- * Reduce a mbedtls_mpi mod p in-place, to use after mbedtls_mpi_sub_mpi
- * N->s < 0 is a very fast test, which fails only if N is 0
- */
-#define MOD_SUB( N )                                                    \
-    while( (N).s < 0 && mbedtls_mpi_cmp_int( &(N), 0 ) != 0 )           \
-        MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &(N), &(N), &grp->P ) )
+/* Set X := A - B mod P.
+ * Assume 0 <= A < P and 0 <= B < P.
+ * Assert 0 <= X < P. */
+static int mbedtls_mpi_sub_mod( mbedtls_mpi *X,
+                                const mbedtls_mpi *A, const mbedtls_mpi *B,
+                                const mbedtls_mpi *P )
+{
+    int ret;
+    if( mbedtls_mpi_cmp_mpi( A, B ) >= 0 )
+    {
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( X, A, B ) );
+    }
+    else
+    {
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( X, B, A ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( X, P, X ) );
+    }
+cleanup:
+    return( ret );
+}
+
+#define MBEDTLS_MPI_SUB_MOD( X, A, B ) mbedtls_mpi_sub_mod( X, A, B, &grp->P )
 
 /*
  * Reduce a mbedtls_mpi mod p in-place, to use after mbedtls_mpi_add_mpi and mbedtls_mpi_mul_int.
@@ -1308,7 +1323,7 @@ static int ecp_double_jac( const mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
         /* M = 3(X + Z^2)(X - Z^2) */
         MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S,  &P->Z,  &P->Z   ) ); MOD_MUL( S );
         MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &T,  &P->X,  &S      ) ); MOD_ADD( T );
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &U,  &P->X,  &S      ) ); MOD_SUB( U );
+        MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &U,  &P->X,  &S      ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S,  &T,     &U      ) ); MOD_MUL( S );
         MBEDTLS_MPI_CHK( mbedtls_mpi_mul_int( &M,  &S,     3       ) ); MOD_ADD( M );
     }
@@ -1341,13 +1356,13 @@ static int ecp_double_jac( const mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
 
     /* T = M^2 - 2.S */
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T,  &M,     &M      ) ); MOD_MUL( T );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T,  &T,     &S      ) ); MOD_SUB( T );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T,  &T,     &S      ) ); MOD_SUB( T );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &T,  &T,     &S      ) );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &T,  &T,     &S      ) );
 
     /* S = M(S - T) - U */
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &S,  &S,     &T      ) ); MOD_SUB( S );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &S,  &S,     &T      ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S,  &S,     &M      ) ); MOD_MUL( S );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &S,  &S,     &U      ) ); MOD_SUB( S );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &S,  &S,     &U      ) );
 
     /* U = 2.Y.Z */
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &U,  &P->Y,  &P->Z   ) ); MOD_MUL( U );
@@ -1418,8 +1433,8 @@ static int ecp_add_mixed( const mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T2,  &T1,    &P->Z ) );  MOD_MUL( T2 );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T1,  &T1,    &Q->X ) );  MOD_MUL( T1 );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T2,  &T2,    &Q->Y ) );  MOD_MUL( T2 );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T1,  &T1,    &P->X ) );  MOD_SUB( T1 );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T2,  &T2,    &P->Y ) );  MOD_SUB( T2 );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &T1,  &T1,    &P->X ) );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &T2,  &T2,    &P->Y ) );
 
     /* Special cases (2) and (3) */
     if( mbedtls_mpi_cmp_int( &T1, 0 ) == 0 )
@@ -1442,12 +1457,12 @@ static int ecp_add_mixed( const mbedtls_ecp_group *grp, mbedtls_ecp_point *R,
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T3,  &T3,    &P->X ) );  MOD_MUL( T3 );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_int( &T1,  &T3,    2     ) );  MOD_ADD( T1 );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &X,   &T2,    &T2   ) );  MOD_MUL( X  );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &X,   &X,     &T1   ) );  MOD_SUB( X  );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &X,   &X,     &T4   ) );  MOD_SUB( X  );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T3,  &T3,    &X    ) );  MOD_SUB( T3 );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &X,   &X,     &T1   ) );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &X,   &X,     &T4   ) );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &T3,  &T3,    &X    ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T3,  &T3,    &T2   ) );  MOD_MUL( T3 );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &T4,  &T4,    &P->Y ) );  MOD_MUL( T4 );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &Y,   &T3,    &T4   ) );  MOD_SUB( Y  );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &Y,   &T3,    &T4   ) );
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &R->X, &X ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &R->Y, &Y ) );
@@ -2260,16 +2275,16 @@ static int ecp_double_add_mxz( const mbedtls_ecp_group *grp,
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &A,    &P->X,   &P->Z ) ); MOD_ADD( A    );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &AA,   &A,      &A    ) ); MOD_MUL( AA   );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &B,    &P->X,   &P->Z ) ); MOD_SUB( B    );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &B,    &P->X,   &P->Z ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &BB,   &B,      &B    ) ); MOD_MUL( BB   );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &E,    &AA,     &BB   ) ); MOD_SUB( E    );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &E,    &AA,     &BB   ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &C,    &Q->X,   &Q->Z ) ); MOD_ADD( C    );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &D,    &Q->X,   &Q->Z ) ); MOD_SUB( D    );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &D,    &Q->X,   &Q->Z ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &DA,   &D,      &A    ) ); MOD_MUL( DA   );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &CB,   &C,      &B    ) ); MOD_MUL( CB   );
     MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &S->X, &DA,     &CB   ) ); MOD_MUL( S->X );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S->X, &S->X,   &S->X ) ); MOD_MUL( S->X );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &S->Z, &DA,     &CB   ) ); MOD_SUB( S->Z );
+    MBEDTLS_MPI_CHK( MBEDTLS_MPI_SUB_MOD( &S->Z, &DA,     &CB   ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S->Z, &S->Z,   &S->Z ) ); MOD_MUL( S->Z );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &S->Z, d,       &S->Z ) ); MOD_MUL( S->Z );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &R->X, &AA,     &BB   ) ); MOD_MUL( R->X );
