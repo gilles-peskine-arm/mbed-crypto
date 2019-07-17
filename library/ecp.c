@@ -1020,6 +1020,15 @@ int mbedtls_ecp_tls_write_group( const mbedtls_ecp_group *grp, size_t *olen,
     return( 0 );
 }
 
+static unsigned long negative[MBEDTLS_ECP_DP_CURVE448+1];
+static unsigned long total[MBEDTLS_ECP_DP_CURVE448+1];
+static void print_stats( void )
+{
+    mbedtls_ecp_group_id i;
+    for( i = 0; i < sizeof( negative ) / sizeof( negative[0] ); i++ )
+        mbedtls_printf( "%d: %lu/%lu\n", i, negative[i], total[i] );
+}
+
 /*
  * Wrapper around fast quasi-modp functions, with fall-back to mbedtls_mpi_mod_mpi.
  * See the documentation of struct mbedtls_ecp_group.
@@ -1036,6 +1045,21 @@ static int ecp_modp( mbedtls_mpi *N, const mbedtls_ecp_group *grp )
         return( mbedtls_mpi_mod_mpi( N, N, &grp->P ) );
 
     MBEDTLS_MPI_CHK( grp->modp( N ) );
+
+    if( N->s < 0 && mbedtls_mpi_cmp_int( N, 0 ) != 0 )
+        MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( N, N, &grp->P ) );
+
+    if( N->s < 0 && mbedtls_mpi_cmp_int( N, 0 ) != 0 )
+    {
+        static int done;
+        if( ! done )
+        {
+            done = 1;
+            atexit( print_stats );
+        }
+        ++negative[grp->id];
+    }
+    ++total[grp->id];
 
     /* N->s < 0 is a much faster test, which fails only if N is 0 */
     while( N->s < 0 && mbedtls_mpi_cmp_int( N, 0 ) != 0 )
