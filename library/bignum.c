@@ -2231,7 +2231,7 @@ cleanup:
 int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *N )
 {
     int ret;
-    mbedtls_mpi G, TA, TU, U1, U2, TB, TV, V1, V2;
+    mbedtls_mpi G, TA, TU, U1, U2, TV, V1, V2;
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( A != NULL );
     MPI_VALIDATE_RET( N != NULL );
@@ -2239,8 +2239,9 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     if( mbedtls_mpi_cmp_int( N, 1 ) <= 0 )
         return( MBEDTLS_ERR_MPI_BAD_INPUT_DATA );
 
-    mbedtls_mpi_init( &TA ); mbedtls_mpi_init( &TU ); mbedtls_mpi_init( &U1 ); mbedtls_mpi_init( &U2 );
-    mbedtls_mpi_init( &G ); mbedtls_mpi_init( &TB ); mbedtls_mpi_init( &TV );
+    mbedtls_mpi_init( &TA ); mbedtls_mpi_init( &TU );
+    mbedtls_mpi_init( &U1 ); mbedtls_mpi_init( &U2 );
+    mbedtls_mpi_init( &G ); mbedtls_mpi_init( &TV );
     mbedtls_mpi_init( &V1 ); mbedtls_mpi_init( &V2 );
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_gcd( &G, A, N ) );
@@ -2252,8 +2253,8 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     }
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &TA, A, N ) );
+
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &TU, &TA ) );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &TB, N ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &TV, N ) );
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_lset( &U1, 1 ) );
@@ -2269,7 +2270,7 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
             if( ( U1.p[0] & 1 ) != 0 || ( U2.p[0] & 1 ) != 0 )
             {
-                MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &U1, &U1, &TB ) );
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &U1, &U1, N ) );
                 MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &U2, &U2, &TA ) );
             }
 
@@ -2283,7 +2284,7 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
             if( ( V1.p[0] & 1 ) != 0 || ( V2.p[0] & 1 ) != 0 )
             {
-                MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &V1, &V1, &TB ) );
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &V1, &V1, N ) );
                 MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &V2, &V2, &TA ) );
             }
 
@@ -2316,8 +2317,9 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
 cleanup:
 
-    mbedtls_mpi_free( &TA ); mbedtls_mpi_free( &TU ); mbedtls_mpi_free( &U1 ); mbedtls_mpi_free( &U2 );
-    mbedtls_mpi_free( &G ); mbedtls_mpi_free( &TB ); mbedtls_mpi_free( &TV );
+    mbedtls_mpi_free( &TA ); mbedtls_mpi_free( &TU );
+    mbedtls_mpi_free( &U1 ); mbedtls_mpi_free( &U2 );
+    mbedtls_mpi_free( &G ); mbedtls_mpi_free( &TV );
     mbedtls_mpi_free( &V1 ); mbedtls_mpi_free( &V2 );
 
     return( ret );
