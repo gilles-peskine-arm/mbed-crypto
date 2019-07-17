@@ -1261,7 +1261,7 @@ static int ecp_safe_invert_jac( const mbedtls_ecp_group *grp,
     mbedtls_mpi_init( &mQY );
 
     /* Use the fact that -Q.Y mod P = P - Q.Y unless Q.Y == 0 */
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &mQY, &grp->P, &Q->Y ) );
+    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &mQY, &grp->P, &Q->Y ) );
     nonzero = mbedtls_mpi_cmp_int( &Q->Y, 0 ) != 0;
     MBEDTLS_MPI_CHK( mbedtls_mpi_safe_cond_assign( &Q->Y, &mQY, inv & nonzero ) );
 
@@ -1907,7 +1907,7 @@ static int ecp_comb_recode_scalar( const mbedtls_ecp_group *grp,
 
     /* execute parity fix in constant time */
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &M, m ) );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &mm, &grp->N, m ) );
+    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &mm, &grp->N, m ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_safe_cond_assign( &M, &mm, *parity_trick ) );
 
     /* actual scalar recoding */
@@ -2456,7 +2456,10 @@ static int ecp_check_pubkey_sw( const mbedtls_ecp_group *grp, const mbedtls_ecp_
     /* Special case for A = -3 */
     if( grp->A.p == NULL )
     {
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_int( &RHS, &RHS, 3       ) );  MOD_SUB( RHS );
+        /* Set RHS := RHS - 3 mod grp->P */
+        if( mbedtls_mpi_cmp_int( &RHS, 3 ) < 0 )
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &RHS, &RHS, &grp->P ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_int( &RHS, &RHS, 3       ) );
     }
     else
     {

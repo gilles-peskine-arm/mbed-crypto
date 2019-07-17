@@ -239,7 +239,7 @@ static int derive_mpi( const mbedtls_ecp_group *grp, mbedtls_mpi *x,
 
     /* While at it, reduce modulo N */
     if( mbedtls_mpi_cmp_mpi( x, &grp->N ) >= 0 )
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( x, x, &grp->N ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( x, x, &grp->N ) );
 
 cleanup:
     return( ret );

@@ -734,7 +734,7 @@ static int ecp_use_curve448( mbedtls_ecp_group *grp )
     MBEDTLS_MPI_CHK( mbedtls_mpi_set_bit( &grp->N, 446, 1 ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_read_string( &Ns, 16,
                                               "8335DC163BB124B65129C96FDE933D8D723A70AADC873D6D54A7BB0D" ) );
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &grp->N, &grp->N, &Ns ) );
+    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &grp->N, &grp->N, &Ns ) );
 
     /* Actually, the required msb for private keys */
     grp->nbits = 447;

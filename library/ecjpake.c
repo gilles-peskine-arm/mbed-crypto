@@ -341,9 +341,12 @@ static int ecjpake_zkp_write( const mbedtls_md_info_t *md_info,
     MBEDTLS_MPI_CHK( mbedtls_ecp_gen_keypair_base( (mbedtls_ecp_group *) grp,
                                                    G, &v, &V, f_rng, p_rng ) );
     MBEDTLS_MPI_CHK( ecjpake_hash( md_info, grp, pf, G, &V, X, id, &h ) );
+    /* Calculate r = v - x*h mod N and place the result in r */
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &h, &h, x ) ); /* x*h */
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &h, &v, &h ) ); /* v - x*h */
-    MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &h, &h, &grp->N ) ); /* r */
+    MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &h, &h, &grp->N ) ); /* x*h mod N */
+    if( mbedtls_mpi_cmp_mpi( &v, &h ) < 0 )
+        MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &v, &v, &grp->N ) );
+    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &h, &v, &h ) );
 
     /* Write it out */
     MBEDTLS_MPI_CHK( mbedtls_ecp_tls_write_point( grp, &V,
