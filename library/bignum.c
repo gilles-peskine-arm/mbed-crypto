@@ -2266,6 +2266,7 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
         goto cleanup;
     }
 
+    /* Let TA := A mod N */
     MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &TA, A, N ) );
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &TU, &TA ) );
@@ -2278,6 +2279,14 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
     do
     {
+        /* Decompose TU = 2^k + m with m odd.
+         * Set TU := m.
+         * Repeat k times:
+         *     If U1 and U2 are both odd:
+         *         Set U1 := U1 + N
+         *         Set U2 := U2 - TA
+         *     Set U1 := floor(U1 / 2) and U2 := floor(U2 / 2)
+         */
         while( ( TU.p[0] & 1 ) == 0 )
         {
             MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &TU, 1 ) );
@@ -2292,6 +2301,14 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
             MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &U2, 1 ) );
         }
 
+        /* Decompose TV = 2^k + m with m odd.
+         * Set TV := m.
+         * Repeat k times:
+         *     If V1 and V2 are both odd:
+         *         Set V1 := V1 + N
+         *         Set V2 := V2 - TA
+         *     Set V1 := floor(V1 / 2) and V2 := floor(V2 / 2)
+         */
         while( ( TV.p[0] & 1 ) == 0 )
         {
             MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &TV, 1 ) );
