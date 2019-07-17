@@ -266,7 +266,10 @@ int mbedtls_rsa_validate_crt( const mbedtls_mpi *P,  const mbedtls_mpi *Q,
         }
 
         MBEDTLS_MPI_CHK( mbedtls_mpi_sub_int( &K, P, 1 ) );
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &L, DP, D ) );
+        if( mbedtls_mpi_cmp_mpi( DP, D ) > 0 )
+            MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &L, DP, D ) );
+        else
+            MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &L, D, DP ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &L, &L, &K ) );
 
         if( mbedtls_mpi_cmp_int( &L, 0 ) != 0 )
@@ -286,7 +289,10 @@ int mbedtls_rsa_validate_crt( const mbedtls_mpi *P,  const mbedtls_mpi *Q,
         }
 
         MBEDTLS_MPI_CHK( mbedtls_mpi_sub_int( &K, Q, 1 ) );
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &L, DQ, D ) );
+        if( mbedtls_mpi_cmp_mpi( DP, D ) > 0 )
+            MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &L, DQ, D ) );
+        else
+            MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &L, D, DQ ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &L, &L, &K ) );
 
         if( mbedtls_mpi_cmp_int( &L, 0 ) != 0 )

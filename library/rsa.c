@@ -564,14 +564,16 @@ int mbedtls_rsa_gen_key( mbedtls_rsa_context *ctx,
         MBEDTLS_MPI_CHK( mbedtls_mpi_gen_prime( &ctx->Q, nbits >> 1,
                                                 prime_quality, f_rng, p_rng ) );
 
+        /* Ensure that P > Q. This is needed both for the subtraction below
+         * and because some users rely on it (even though standards don't
+         * require it). */
+        if( mbedtls_mpi_cmp_mpi( &ctx->P, &ctx->Q ) < 0 )
+            mbedtls_mpi_swap( &ctx->P, &ctx->Q );
+
         /* make sure the difference between p and q is not too small (FIPS 186-4 §B.3.3 step 5.4) */
-        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &H, &ctx->P, &ctx->Q ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &H, &ctx->P, &ctx->Q ) );
         if( mbedtls_mpi_bitlen( &H ) <= ( ( nbits >= 200 ) ? ( ( nbits >> 1 ) - 99 ) : 0 ) )
             continue;
-
-        /* not required by any standards, but some users rely on the fact that P > Q */
-        if( H.s < 0 )
-            mbedtls_mpi_swap( &ctx->P, &ctx->Q );
 
         /* Temporarily replace P,Q by P-1, Q-1 */
         MBEDTLS_MPI_CHK( mbedtls_mpi_sub_int( &ctx->P, &ctx->P, 1 ) );
@@ -985,7 +987,15 @@ int mbedtls_rsa_private( mbedtls_rsa_context *ctx,
     /*
      * T = (TP - TQ) * (Q^-1 mod P) mod P
      */
-    MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &T, &TP, &TQ ) );
+    if( mbedtls_mpi_cmp_mpi( &TP, &TQ ) >= 0 )
+    {
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &T, &TP, &TQ ) );
+    }
+    else
+    {
+        MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &T, &TP, &ctx->P ) );
+        MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &T, &T, &TQ ) );
+    }
     MBEDTLS_MPI_CHK( mbedtls_mpi_mul_mpi( &TP, &T, &ctx->QP ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_mod_mpi( &T, &TP, &ctx->P ) );
 
