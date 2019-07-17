@@ -1245,19 +1245,14 @@ static void mpi_sub_hlp( size_t n, mbedtls_mpi_uint *s, mbedtls_mpi_uint *d )
 }
 
 /*
- * Unsigned subtraction: X = |A| - |B|  (HAC 14.9)
+ * Unsigned subtraction: X = A - B  (HAC 14.9)
+ * Assumes that A >= B >= 0.
  */
-int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *B )
+static int mpi_sub_abs_internal( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *B )
 {
     mbedtls_mpi TB;
     int ret;
     size_t n;
-    MPI_VALIDATE_RET( X != NULL );
-    MPI_VALIDATE_RET( A != NULL );
-    MPI_VALIDATE_RET( B != NULL );
-
-    if( mbedtls_mpi_cmp_abs( A, B ) < 0 )
-        return( MBEDTLS_ERR_MPI_NEGATIVE_VALUE );
 
     mbedtls_mpi_init( &TB );
 
@@ -1286,6 +1281,20 @@ cleanup:
     mbedtls_mpi_free( &TB );
 
     return( ret );
+}
+
+/*
+ * Unsigned subtraction: X = A - B
+ * Assumes that A >= 0 and B >= 0, errors if A < B.
+ */
+int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *B )
+{
+    MPI_VALIDATE_RET( X != NULL );
+    MPI_VALIDATE_RET( A != NULL );
+    MPI_VALIDATE_RET( B != NULL );
+    if( mbedtls_mpi_cmp_abs( A, B ) < 0 )
+        return( MBEDTLS_ERR_MPI_NEGATIVE_VALUE );
+    return( mpi_sub_abs_internal( X, A, B ) );
 }
 
 /*
