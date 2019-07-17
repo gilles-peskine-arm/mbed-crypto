@@ -46,6 +46,14 @@
 #define MBEDTLS_ERR_MPI_NOT_ACCEPTABLE                    -0x000E  /**< The input arguments are not acceptable. */
 #define MBEDTLS_ERR_MPI_ALLOC_FAILED                      -0x0010  /**< Memory allocation failed. */
 
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+#if defined(MBEDTLS_DEPRECATED_WARNING)
+#define MBEDTLS_DEPRECATED      __attribute__((deprecated))
+#else
+#define MBEDTLS_DEPRECATED
+#endif
+#endif
+
 #define MBEDTLS_MPI_CHK(f)       \
     do                           \
     {                            \
@@ -184,7 +192,9 @@ extern "C" {
  */
 typedef struct mbedtls_mpi
 {
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     int s;              /*!<  integer sign      */
+#endif /* MBEDTLS_BIGNUM_SIGNED */
     size_t n;           /*!<  total # of limbs  */
     mbedtls_mpi_uint *p;          /*!<  pointer to limbs  */
 }
@@ -570,18 +580,6 @@ int mbedtls_mpi_shift_l( mbedtls_mpi *X, size_t count );
 int mbedtls_mpi_shift_r( mbedtls_mpi *X, size_t count );
 
 /**
- * \brief          Compare the absolute values of two MPIs.
- *
- * \param X        The left-hand MPI. This must point to an initialized MPI.
- * \param Y        The right-hand MPI. This must point to an initialized MPI.
- *
- * \return         \c 1 if `|X|` is greater than `|Y|`.
- * \return         \c -1 if `|X|` is lesser than `|Y|`.
- * \return         \c 0 if `|X|` is equal to `|Y|`.
- */
-int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y );
-
-/**
  * \brief          Compare two MPIs.
  *
  * \param X        The left-hand MPI. This must point to an initialized MPI.
@@ -592,6 +590,29 @@ int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y );
  * \return         \c 0 if \p X is equal to \p Y.
  */
 int mbedtls_mpi_cmp_mpi( const mbedtls_mpi *X, const mbedtls_mpi *Y );
+
+#if defined(MBEDTLS_BIGNUM_SIGNED)
+/**
+ * \brief          Compare the absolute values of two MPIs.
+ *
+ * \param X        The left-hand MPI. This must point to an initialized MPI.
+ * \param Y        The right-hand MPI. This must point to an initialized MPI.
+ *
+ * \return         \c 1 if `|X|` is greater than `|Y|`.
+ * \return         \c -1 if `|X|` is lesser than `|Y|`.
+ * \return         \c 0 if `|X|` is equal to `|Y|`.
+ */
+int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y );
+#else /* MBEDTLS_BIGNUM_SIGNED */
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+/** Backward compatibility alias for mbedtls_mpi_cmp_mpi(). */
+MBEDTLS_DEPRECATED static inline int mbedtls_mpi_cmp_abs(
+    const mbedtls_mpi *X, const mbedtls_mpi *Y )
+{
+    return( mbedtls_mpi_cmp_mpi( X, Y ) );
+}
+#endif
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
 /**
  * \brief          Compare an MPI with an integer.
@@ -604,35 +625,6 @@ int mbedtls_mpi_cmp_mpi( const mbedtls_mpi *X, const mbedtls_mpi *Y );
  * \return         \c 0 if \p X is equal to \p z.
  */
 int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, mbedtls_mpi_sint z );
-
-/**
- * \brief          Perform an unsigned addition of MPIs: X = |A| + |B|
- *
- * \param X        The destination MPI. This must point to an initialized MPI.
- * \param A        The first summand. This must point to an initialized MPI.
- * \param B        The second summand. This must point to an initialized MPI.
- *
- * \return         \c 0 if successful.
- * \return         #MBEDTLS_ERR_MPI_ALLOC_FAILED if a memory allocation failed.
- * \return         Another negative error code on different kinds of failure.
- */
-int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A,
-                         const mbedtls_mpi *B );
-
-/**
- * \brief          Perform an unsigned subtraction of MPIs: X = |A| - |B|
- *
- * \param X        The destination MPI. This must point to an initialized MPI.
- * \param A        The minuend. This must point to an initialized MPI.
- * \param B        The subtrahend. This must point to an initialized MPI.
- *
- * \return         \c 0 if successful.
- * \return         #MBEDTLS_ERR_MPI_NEGATIVE_VALUE if \p B is greater than \p A.
- * \return         Another negative error code on different kinds of failure.
- *
- */
-int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A,
-                         const mbedtls_mpi *B );
 
 /**
  * \brief          Perform a signed addition of MPIs: X = A + B
@@ -648,19 +640,30 @@ int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A,
 int mbedtls_mpi_add_mpi( mbedtls_mpi *X, const mbedtls_mpi *A,
                          const mbedtls_mpi *B );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 /**
- * \brief          Perform a signed subtraction of MPIs: X = A - B
+ * \brief          Perform an unsigned addition of MPIs: X = |A| + |B|
  *
  * \param X        The destination MPI. This must point to an initialized MPI.
- * \param A        The minuend. This must point to an initialized MPI.
- * \param B        The subtrahend. This must point to an initialized MPI.
+ * \param A        The first summand. This must point to an initialized MPI.
+ * \param B        The second summand. This must point to an initialized MPI.
  *
  * \return         \c 0 if successful.
  * \return         #MBEDTLS_ERR_MPI_ALLOC_FAILED if a memory allocation failed.
  * \return         Another negative error code on different kinds of failure.
  */
-int mbedtls_mpi_sub_mpi( mbedtls_mpi *X, const mbedtls_mpi *A,
+int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A,
                          const mbedtls_mpi *B );
+#else /* MBEDTLS_BIGNUM_SIGNED */
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+/** Backward compatibility alias for mbedtls_mpi_add_mpi(). */
+MBEDTLS_DEPRECATED static inline int mbedtls_mpi_add_abs(
+    mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *B )
+{
+    return( mbedtls_mpi_add_mpi( X, A, B ) );
+}
+#endif
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
 /**
  * \brief          Perform a signed addition of an MPI and an integer: X = A + b
@@ -675,6 +678,37 @@ int mbedtls_mpi_sub_mpi( mbedtls_mpi *X, const mbedtls_mpi *A,
  */
 int mbedtls_mpi_add_int( mbedtls_mpi *X, const mbedtls_mpi *A,
                          mbedtls_mpi_sint b );
+
+#if defined(MBEDTLS_BIGNUM_SIGNED)
+/**
+ * \brief          Perform a signed subtraction of MPIs: X = A - B
+ *
+ * \param X        The destination MPI. This must point to an initialized MPI.
+ * \param A        The minuend. This must point to an initialized MPI.
+ * \param B        The subtrahend. This must point to an initialized MPI.
+ *
+ * \return         \c 0 if successful.
+ * \return         #MBEDTLS_ERR_MPI_ALLOC_FAILED if a memory allocation failed.
+ * \return         Another negative error code on different kinds of failure.
+ */
+int mbedtls_mpi_sub_mpi( mbedtls_mpi *X, const mbedtls_mpi *A,
+                         const mbedtls_mpi *B );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
+
+/**
+ * \brief          Perform an unsigned subtraction of MPIs: X = |A| - |B|
+ *
+ * \param X        The destination MPI. This must point to an initialized MPI.
+ * \param A        The minuend. This must point to an initialized MPI.
+ * \param B        The subtrahend. This must point to an initialized MPI.
+ *
+ * \return         \c 0 if successful.
+ * \return         #MBEDTLS_ERR_MPI_NEGATIVE_VALUE if \p B is greater than \p A.
+ * \return         Another negative error code on different kinds of failure.
+ *
+ */
+int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A,
+                         const mbedtls_mpi *B );
 
 /**
  * \brief          Perform a signed subtraction of an MPI and an integer:
@@ -888,11 +922,6 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
                          const mbedtls_mpi *N );
 
 #if !defined(MBEDTLS_DEPRECATED_REMOVED)
-#if defined(MBEDTLS_DEPRECATED_WARNING)
-#define MBEDTLS_DEPRECATED      __attribute__((deprecated))
-#else
-#define MBEDTLS_DEPRECATED
-#endif
 /**
  * \brief          Perform a Miller-Rabin primality test with error
  *                 probability of 2<sup>-80</sup>.
@@ -915,7 +944,6 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
 MBEDTLS_DEPRECATED int mbedtls_mpi_is_prime( const mbedtls_mpi *X,
                           int (*f_rng)(void *, unsigned char *, size_t),
                           void *p_rng );
-#undef MBEDTLS_DEPRECATED
 #endif /* !MBEDTLS_DEPRECATED_REMOVED */
 
 /**
@@ -992,6 +1020,10 @@ int mbedtls_mpi_gen_prime( mbedtls_mpi *X, size_t nbits, int flags,
 int mbedtls_mpi_self_test( int verbose );
 
 #endif /* MBEDTLS_SELF_TEST */
+
+#if !defined(MBEDTLS_DEPRECATED_REMOVED)
+#undef MBEDTLS_DEPRECATED
+#endif
 
 #ifdef __cplusplus
 }

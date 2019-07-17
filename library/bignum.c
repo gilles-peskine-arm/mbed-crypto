@@ -83,6 +83,7 @@ static void mbedtls_mpi_zeroize( mbedtls_mpi_uint *v, size_t n )
     mbedtls_platform_zeroize( v, ciL * n );
 }
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 static inline int get_sign( const mbedtls_mpi *X )
 {
     return( X->s );
@@ -91,6 +92,12 @@ static inline void set_sign( mbedtls_mpi *X, int sign )
 {
     X->s = sign;
 }
+#else /* MBEDTLS_BIGNUM_SIGNED */
+#define get_sign( X ) 1
+#define set_sign( X, sign ) ( (void)( X ) )
+#endif /* MBEDTLS_BIGNUM_SIGNED */
+
+
 /*
  * Initialize one MPI
  */
@@ -286,7 +293,7 @@ cleanup:
  */
 int mbedtls_mpi_safe_cond_swap( mbedtls_mpi *X, mbedtls_mpi *Y, unsigned char swap )
 {
-    int ret, s;
+    int ret;
     size_t i;
     mbedtls_mpi_uint tmp;
     MPI_VALIDATE_RET( X != NULL );
@@ -301,10 +308,13 @@ int mbedtls_mpi_safe_cond_swap( mbedtls_mpi *X, mbedtls_mpi *Y, unsigned char sw
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, Y->n ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( Y, X->n ) );
 
-    s = X->s;
-    X->s = X->s * ( 1 - swap ) + Y->s * swap;
-    Y->s = Y->s * ( 1 - swap ) +    s * swap;
-
+#if defined(MBEDTLS_BIGNUM_SIGNED)
+    {
+        int s = X->s;
+        X->s = X->s * ( 1 - swap ) + Y->s * swap;
+        Y->s = Y->s * ( 1 - swap ) +    s * swap;
+    }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     for( i = 0; i < X->n; i++ )
     {
@@ -324,6 +334,11 @@ int mbedtls_mpi_lset( mbedtls_mpi *X, mbedtls_mpi_sint z )
 {
     int ret;
     MPI_VALIDATE_RET( X != NULL );
+
+#if !defined(MBEDTLS_BIGNUM_SIGNED)
+    if( z < 0 )
+        return( MBEDTLS_ERR_MPI_NEGATIVE_VALUE );
+#endif /* !MBEDTLS_BIGNUM_SIGNED */
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, 1 ) );
     memset( X->p, 0, X->n * ciL );
@@ -491,11 +506,13 @@ int mbedtls_mpi_read_string( mbedtls_mpi *X, int radix, const char *s )
 
         for( i = slen, j = 0; i > 0; i--, j++ )
         {
+#if defined(MBEDTLS_BIGNUM_SIGNED)
             if( i == 1 && s[i - 1] == '-' )
             {
                 X->s = -1;
                 break;
             }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
             MBEDTLS_MPI_CHK( mpi_get_digit( &d, radix, s[i - 1] ) );
             X->p[j / ( 2 * ciL )] |= d << ( ( j % ( 2 * ciL ) ) << 2 );
@@ -507,11 +524,13 @@ int mbedtls_mpi_read_string( mbedtls_mpi *X, int radix, const char *s )
 
         for( i = 0; i < slen; i++ )
         {
+#if defined(MBEDTLS_BIGNUM_SIGNED)
             if( i == 0 && s[i] == '-' )
             {
                 X->s = -1;
                 continue;
             }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
             MBEDTLS_MPI_CHK( mpi_get_digit( &d, radix, s[i] ) );
             MBEDTLS_MPI_CHK( mbedtls_mpi_mul_int( &T, X, radix ) );
@@ -601,7 +620,9 @@ int mbedtls_mpi_write_string( const mbedtls_mpi *X, int radix,
     n += 1; /* Terminating null byte */
     n += 1; /* Compensate for the divisions above, which round down `n`
              * in case it's not even. */
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     n += 1; /* Potential '-'-sign. */
+#endif /* MBEDTLS_BIGNUM_SIGNED */
     n += ( n & 1 ); /* Make n even to have enough space for hexadecimal writing,
                      * which always uses an even number of hex-digits. */
 
@@ -1085,6 +1106,9 @@ int mbedtls_mpi_shift_r( mbedtls_mpi *X, size_t count )
 /*
  * Compare unsigned values
  */
+#if !defined(MBEDTLS_BIGNUM_SIGNED)
+#define mbedtls_mpi_cmp_abs mbedtls_mpi_cmp_mpi
+#endif /* !MBEDTLS_BIGNUM_SIGNED */
 int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y )
 {
     size_t i, j;
@@ -1114,6 +1138,7 @@ int mbedtls_mpi_cmp_abs( const mbedtls_mpi *X, const mbedtls_mpi *Y )
     return( 0 );
 }
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 /*
  * Compare signed values
  */
@@ -1148,9 +1173,10 @@ int mbedtls_mpi_cmp_mpi( const mbedtls_mpi *X, const mbedtls_mpi *Y )
 
     return( 0 );
 }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
 /*
- * Compare signed values
+ * Compare a multi-precision integer with a signed single-word integer
  */
 int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, mbedtls_mpi_sint z )
 {
@@ -1159,7 +1185,12 @@ int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, mbedtls_mpi_sint z )
     MPI_VALIDATE_RET( X != NULL );
 
     *p  = ( z < 0 ) ? -z : z;
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     Y.s = ( z < 0 ) ? -1 : 1;
+#else
+    if( z < 0 )
+        return( 1 );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
     Y.n = 1;
     Y.p = p;
 
@@ -1169,6 +1200,9 @@ int mbedtls_mpi_cmp_int( const mbedtls_mpi *X, mbedtls_mpi_sint z )
 /*
  * Unsigned addition: X = |A| + |B|  (HAC 14.7)
  */
+#if !defined(MBEDTLS_BIGNUM_SIGNED)
+#define mbedtls_mpi_add_abs mbedtls_mpi_add_mpi
+#endif /* !MBEDTLS_BIGNUM_SIGNED */
 int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi *B )
 {
     int ret;
@@ -1297,6 +1331,36 @@ int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     return( mpi_sub_abs_internal( X, A, B ) );
 }
 
+#if !defined(MBEDTLS_BIGNUM_SIGNED)
+typedef enum
+{
+    POS = 0,
+    NEG = 1
+} sign_t;
+
+/*
+ * Addition of signed numbers: X = X + B
+ * Pass and return the sign bits separately.
+ */
+int mbedtls_mpi_add_signed( sign_t *Xs, mbedtls_mpi *X,
+                            sign_t Bs, const mbedtls_mpi *B )
+{
+    if( *Xs == Bs )
+        return( mbedtls_mpi_add_mpi( X, X, B ) );
+
+    if( mbedtls_mpi_cmp_abs( X, B ) < 0 )
+    {
+        *Xs = ! *Xs;
+        return( mpi_sub_abs_internal( X, B, X ) );
+    }
+    else
+    {
+        return( mpi_sub_abs_internal( X, X, B ) );
+    }
+}
+#endif /* !MBEDTLS_BIGNUM_SIGNED */
+
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 /*
  * Signed addition: X = A + B
  */
@@ -1331,7 +1395,9 @@ cleanup:
 
     return( ret );
 }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 /*
  * Signed subtraction: X = A - B
  */
@@ -1366,6 +1432,7 @@ cleanup:
 
     return( ret );
 }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
 /*
  * Signed addition: X = A + b
@@ -1378,11 +1445,18 @@ int mbedtls_mpi_add_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_sint 
     MPI_VALIDATE_RET( A != NULL );
 
     p[0] = ( b < 0 ) ? -b : b;
-    _B.s = ( b < 0 ) ? -1 : 1;
     _B.n = 1;
     _B.p = p;
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
+    _B.s = ( b < 0 ) ? -1 : 1;
     return( mbedtls_mpi_add_mpi( X, A, &_B ) );
+#else /* MBEDTLS_BIGNUM_SIGNED */
+    if( b < 0 )
+        return( mbedtls_mpi_sub_abs( X, A, &_B ) );
+    else
+        return( mbedtls_mpi_add_mpi( X, A, &_B ) );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 }
 
 /*
@@ -1396,11 +1470,18 @@ int mbedtls_mpi_sub_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_sint 
     MPI_VALIDATE_RET( A != NULL );
 
     p[0] = ( b < 0 ) ? -b : b;
-    _B.s = ( b < 0 ) ? -1 : 1;
     _B.n = 1;
     _B.p = p;
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
+    _B.s = ( b < 0 ) ? -1 : 1;
     return( mbedtls_mpi_sub_mpi( X, A, &_B ) );
+#else /* MBEDTLS_BIGNUM_SIGNED */
+    if( b < 0 )
+        return( mbedtls_mpi_add_mpi( X, A, &_B ) );
+    else
+        return( mbedtls_mpi_sub_abs( X, A, &_B ) );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 }
 
 /*
@@ -1736,8 +1817,10 @@ int mbedtls_mpi_div_mpi( mbedtls_mpi *Q, mbedtls_mpi *R, const mbedtls_mpi *A,
         set_sign( &X, get_sign( A ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( R, &X ) );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
         if( mbedtls_mpi_cmp_int( R, 0 ) == 0 )
             R->s = 1;
+#endif /* MBEDTLS_BIGNUM_SIGNED */
     }
 
 cleanup:
@@ -1759,8 +1842,14 @@ int mbedtls_mpi_div_int( mbedtls_mpi *Q, mbedtls_mpi *R,
     mbedtls_mpi_uint p[1];
     MPI_VALIDATE_RET( A != NULL );
 
-    p[0] = ( b < 0 ) ? -b : b;
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     _B.s = ( b < 0 ) ? -1 : 1;
+#else /* MBEDTLS_BIGNUM_SIGNED */
+    if( b < 0 )
+        return( MBEDTLS_ERR_MPI_NEGATIVE_VALUE );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
+
+    p[0] = ( b < 0 ) ? -b : b;
     _B.n = 1;
     _B.p = p;
 
@@ -1941,7 +2030,9 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
     size_t bufsize, nbits;
     mbedtls_mpi_uint ei, mm, state;
     mbedtls_mpi RR, T, W[ 2 << MBEDTLS_MPI_WINDOW_SIZE ], Apos;
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     int neg;
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( A != NULL );
@@ -1977,6 +2068,7 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &W[1],  j ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &T, j * 2 ) );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     /*
      * Compensate for negative A (and correct at the end)
      */
@@ -1987,6 +2079,7 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
         Apos.s = 1;
         A = &Apos;
     }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     /*
      * If 1st call, pre-compute R^2 mod N
@@ -2126,11 +2219,13 @@ int mbedtls_mpi_exp_mod( mbedtls_mpi *X, const mbedtls_mpi *A,
      */
     MBEDTLS_MPI_CHK( mpi_montred( X, N, mm, &T ) );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     if( neg && E->n != 0 && ( E->p[0] & 1 ) != 0 )
     {
         X->s = -1;
         MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( X, N, X ) );
     }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
 cleanup:
 
@@ -2246,6 +2341,12 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 {
     int ret;
     mbedtls_mpi G, TA, TU, U1, U2, TV, V1, V2;
+#if !defined(MBEDTLS_BIGNUM_SIGNED)
+    sign_t U1s = POS;
+    sign_t U2s = POS;
+    sign_t V1s = POS;
+    sign_t V2s = POS;
+#endif /* !MBEDTLS_BIGNUM_SIGNED */
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( A != NULL );
     MPI_VALIDATE_RET( N != NULL );
@@ -2293,8 +2394,13 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
             if( ( U1.p[0] & 1 ) != 0 || ( U2.p[0] & 1 ) != 0 )
             {
+#if defined(MBEDTLS_BIGNUM_SIGNED)
                 MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &U1, &U1, N ) );
                 MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &U2, &U2, &TA ) );
+#else
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &U1s, &U1, POS, N ) );
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &U2s, &U2, NEG, &TA ) );
+#endif
             }
 
             MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &U1, 1 ) );
@@ -2315,8 +2421,13 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
 
             if( ( V1.p[0] & 1 ) != 0 || ( V2.p[0] & 1 ) != 0 )
             {
+#if defined(MBEDTLS_BIGNUM_SIGNED)
                 MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &V1, &V1, N ) );
                 MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &V2, &V2, &TA ) );
+#else
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &V1s, &V1, POS, N ) );
+                MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &V2s, &V2, NEG, &TA ) );
+#endif
             }
 
             MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &V1, 1 ) );
@@ -2326,23 +2437,48 @@ int mbedtls_mpi_inv_mod( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
         if( mbedtls_mpi_cmp_mpi( &TU, &TV ) >= 0 )
         {
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &TU, &TU, &TV ) );
+#if defined(MBEDTLS_BIGNUM_SIGNED)
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &U1, &U1, &V1 ) );
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &U2, &U2, &V2 ) );
+#else
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &U1s, &U1, NEG, &V1 ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &U2s, &U2, NEG, &V2 ) );
+#endif
         }
         else
         {
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_abs( &TV, &TV, &TU ) );
+#if defined(MBEDTLS_BIGNUM_SIGNED)
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &V1, &V1, &U1 ) );
             MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &V2, &V2, &U2 ) );
+#else
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &V1s, &V1, NEG, &U1 ) );
+            MBEDTLS_MPI_CHK( mbedtls_mpi_add_signed( &V2s, &V2, NEG, &U2 ) );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
         }
     }
     while( mbedtls_mpi_cmp_int( &TU, 0 ) != 0 );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     while( mbedtls_mpi_cmp_int( &V1, 0 ) < 0 )
         MBEDTLS_MPI_CHK( mbedtls_mpi_add_mpi( &V1, &V1, N ) );
 
     while( mbedtls_mpi_cmp_mpi( &V1, N ) >= 0 )
         MBEDTLS_MPI_CHK( mbedtls_mpi_sub_mpi( &V1, &V1, N ) );
+#else /* MBEDTLS_BIGNUM_SIGNED */
+    if( V1s == NEG )
+    {
+        while( mbedtls_mpi_cmp_mpi( &V1, N ) > 0 )
+            MBEDTLS_MPI_CHK( mpi_sub_abs_internal( &V1, &V1, N ) );
+        /* Now V1 contains - v1 with 0 < v1 <= N, and we want N - v1 */
+        MBEDTLS_MPI_CHK( mpi_sub_abs_internal( &V1, N, &V1 ) );
+    }
+    else
+    {
+        while( mbedtls_mpi_cmp_mpi( &V1, N ) >= 0 )
+            MBEDTLS_MPI_CHK( mpi_sub_abs_internal( &V1, &V1, N ) );
+    }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( X, &V1 ) );
 

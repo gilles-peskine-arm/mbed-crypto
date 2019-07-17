@@ -767,6 +767,16 @@
 #define MBEDTLS_ERROR_STRERROR_DUMMY
 
 /**
+ * \def MBEDTLS_BIGNUM_SIGNED
+ *
+ * Enable support for negative integers in the multi-precision integer
+ * module. This is not needed for anything else in the library.
+ *
+ * Requires: MBEDTLS_BIGNUM_C
+ */
+#define MBEDTLS_BIGNUM_SIGNED
+
+/**
  * \def MBEDTLS_GENPRIME
  *
  * Enable the prime-number generation code.

@@ -179,12 +179,14 @@ void mpi_invalid_param( )
     TEST_INVALID_PARAM_RET( MBEDTLS_ERR_MPI_BAD_INPUT_DATA,
                             mbedtls_mpi_add_mpi( &X, &X, NULL ) );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     TEST_INVALID_PARAM_RET( MBEDTLS_ERR_MPI_BAD_INPUT_DATA,
                             mbedtls_mpi_sub_mpi( NULL, &X, &X ) );
     TEST_INVALID_PARAM_RET( MBEDTLS_ERR_MPI_BAD_INPUT_DATA,
                             mbedtls_mpi_sub_mpi( &X, NULL, &X ) );
     TEST_INVALID_PARAM_RET( MBEDTLS_ERR_MPI_BAD_INPUT_DATA,
                             mbedtls_mpi_sub_mpi( &X, &X, NULL ) );
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     TEST_INVALID_PARAM_RET( MBEDTLS_ERR_MPI_BAD_INPUT_DATA,
                             mbedtls_mpi_add_int( NULL, &X, 42 ) );

@@ -144,6 +144,7 @@ int mbedtls_asn1_write_mpi( unsigned char **p, unsigned char *start, const mbedt
     (*p) -= len;
     MBEDTLS_MPI_CHK( mbedtls_mpi_write_binary( X, *p, len ) );
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
     // DER format assumes 2s complement for numbers, so the leftmost bit
     // should be 0 for positive numbers and 1 for negative numbers.
     //
@@ -155,6 +156,7 @@ int mbedtls_asn1_write_mpi( unsigned char **p, unsigned char *start, const mbedt
         *--(*p) = 0x00;
         len += 1;
     }
+#endif /* MBEDTLS_BIGNUM_SIGNED */
 
     MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_len( p, start, len ) );
     MBEDTLS_ASN1_CHK_ADD( len, mbedtls_asn1_write_tag( p, start, MBEDTLS_ASN1_INTEGER ) );

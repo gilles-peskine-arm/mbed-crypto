@@ -45,7 +45,12 @@
 #define inline __inline
 #endif
 
+#if defined(MBEDTLS_BIGNUM_SIGNED)
 #define mpi_set_nonnegative( X ) ( ( X ).s = 1 )
+#else /* MBEDTLS_BIGNUM_SIGNED */
+#define mpi_set_nonnegative( X ) ( (void) ( X ) )
+#endif /* MBEDTLS_BIGNUM_SIGNED */
+
 /*
  * Conversion macros for embedded constants:
  * build lists of mbedtls_mpi_uint's from lists of unsigned char's grouped by 8, 4 or 2
