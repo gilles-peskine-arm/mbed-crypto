@@ -45,6 +45,7 @@
 #define inline __inline
 #endif
 
+#define mpi_set_nonnegative( X ) ( ( X ).s = 1 )
 /*
  * Conversion macros for embedded constants:
  * build lists of mbedtls_mpi_uint's from lists of unsigned char's grouped by 8, 4 or 2
@@ -562,7 +563,7 @@ static const mbedtls_mpi_uint brainpoolP512r1_n[] = {
  */
 static inline void ecp_mpi_load( mbedtls_mpi *X, const mbedtls_mpi_uint *p, size_t len )
 {
-    X->s = 1;
+    mpi_set_nonnegative( *X );
     X->n = len / sizeof( mbedtls_mpi_uint );
     X->p = (mbedtls_mpi_uint *) p;
 }
@@ -573,7 +574,7 @@ static inline void ecp_mpi_load( mbedtls_mpi *X, const mbedtls_mpi_uint *p, size
 static inline void ecp_mpi_set1( mbedtls_mpi *X )
 {
     static mbedtls_mpi_uint one[] = { 1 };
-    X->s = 1;
+    mpi_set_nonnegative( *X );
     X->n = 1;
     X->p = one;
 }
@@ -998,7 +999,7 @@ static inline void sub32( uint32_t *dst, uint32_t src, signed char *carry )
     mbedtls_mpi C;                                                      \
     mbedtls_mpi_uint Cp[ (b) / 8 / sizeof( mbedtls_mpi_uint) + 1 ];     \
                                                                         \
-    C.s = 1;                                                            \
+    mpi_set_nonnegative( C );                                                            \
     C.n = (b) / 8 / sizeof( mbedtls_mpi_uint) + 1;                      \
     C.p = Cp;                                                           \
     memset( Cp, 0, C.n * sizeof( mbedtls_mpi_uint ) );                  \
@@ -1197,7 +1198,7 @@ static int ecp_mod_p521( mbedtls_mpi *N )
         return( 0 );
 
     /* M = A1 */
-    M.s = 1;
+    mpi_set_nonnegative( M );
     M.n = N->n - ( P521_WIDTH - 1 );
     if( M.n > P521_WIDTH + 1 )
         M.n = P521_WIDTH + 1;
@@ -1243,7 +1244,7 @@ static int ecp_mod_p255( mbedtls_mpi *N )
         return( 0 );
 
     /* M = A1 */
-    M.s = 1;
+    mpi_set_nonnegative( M );
     M.n = N->n - ( P255_WIDTH - 1 );
     if( M.n > P255_WIDTH + 1 )
         return( MBEDTLS_ERR_ECP_BAD_INPUT_DATA );
@@ -1300,7 +1301,7 @@ static int ecp_mod_p448( mbedtls_mpi *N )
         return( 0 );
 
     /* M = A1 */
-    M.s = 1;
+    mpi_set_nonnegative( M );
     M.n = N->n - ( P448_WIDTH );
     if( M.n > P448_WIDTH )
         /* Shouldn't be called with N larger than 2^896! */
@@ -1362,12 +1363,12 @@ static inline int ecp_mod_koblitz( mbedtls_mpi *N, mbedtls_mpi_uint *Rp, size_t 
         return( 0 );
 
     /* Init R */
-    R.s = 1;
+    mpi_set_nonnegative( R );
     R.p = Rp;
     R.n = P_KOBLITZ_R;
 
     /* Common setup for M */
-    M.s = 1;
+    mpi_set_nonnegative( M );
     M.p = Mp;
 
     /* M = A1 */

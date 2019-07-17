@@ -83,6 +83,14 @@ static void mbedtls_mpi_zeroize( mbedtls_mpi_uint *v, size_t n )
     mbedtls_platform_zeroize( v, ciL * n );
 }
 
+static inline int get_sign( const mbedtls_mpi *X )
+{
+    return( X->s );
+}
+static inline void set_sign( mbedtls_mpi *X, int sign )
+{
+    X->s = sign;
+}
 /*
  * Initialize one MPI
  */
@@ -90,7 +98,7 @@ void mbedtls_mpi_init( mbedtls_mpi *X )
 {
     MPI_VALIDATE( X != NULL );
 
-    X->s = 1;
+    set_sign( X, 1 );
     X->n = 0;
     X->p = NULL;
 }
@@ -109,7 +117,7 @@ void mbedtls_mpi_free( mbedtls_mpi *X )
         mbedtls_free( X->p );
     }
 
-    X->s = 1;
+    set_sign( X, 1 );
     X->n = 0;
     X->p = NULL;
 }
@@ -209,7 +217,7 @@ int mbedtls_mpi_copy( mbedtls_mpi *X, const mbedtls_mpi *Y )
             break;
     i++;
 
-    X->s = Y->s;
+    set_sign( X, get_sign( Y ) );
 
     if( X->n < i )
     {
@@ -258,7 +266,7 @@ int mbedtls_mpi_safe_cond_assign( mbedtls_mpi *X, const mbedtls_mpi *Y, unsigned
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( X, Y->n ) );
 
-    X->s = X->s * ( 1 - assign ) + Y->s * assign;
+    set_sign( X, get_sign( X ) * ( 1 - assign ) + get_sign( Y ) * assign );
 
     for( i = 0; i < Y->n; i++ )
         X->p[i] = X->p[i] * ( 1 - assign ) + Y->p[i] * assign;
@@ -321,7 +329,7 @@ int mbedtls_mpi_lset( mbedtls_mpi *X, mbedtls_mpi_sint z )
     memset( X->p, 0, X->n * ciL );
 
     X->p[0] = ( z < 0 ) ? -z : z;
-    X->s    = ( z < 0 ) ? -1 : 1;
+    set_sign( X, ( z < 0 ) ? -1 : 1 );
 
 cleanup:
 
@@ -508,7 +516,7 @@ int mbedtls_mpi_read_string( mbedtls_mpi *X, int radix, const char *s )
             MBEDTLS_MPI_CHK( mpi_get_digit( &d, radix, s[i] ) );
             MBEDTLS_MPI_CHK( mbedtls_mpi_mul_int( &T, X, radix ) );
 
-            if( X->s == 1 )
+            if( get_sign( X ) > 0 )
             {
                 MBEDTLS_MPI_CHK( mbedtls_mpi_add_int( X, &T, d ) );
             }
@@ -606,7 +614,7 @@ int mbedtls_mpi_write_string( const mbedtls_mpi *X, int radix,
     p = buf;
     mbedtls_mpi_init( &T );
 
-    if( X->s == -1 )
+    if( get_sign( X ) == -1 )
     {
         *p++ = '-';
         buflen--;
@@ -635,9 +643,7 @@ int mbedtls_mpi_write_string( const mbedtls_mpi *X, int radix,
     else
     {
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &T, X ) );
-
-        if( T.s == -1 )
-            T.s = 1;
+        set_sign( &T, 1 );
 
         MBEDTLS_MPI_CHK( mpi_write_hlp( &T, radix, &p, buflen ) );
     }
@@ -1180,10 +1186,8 @@ int mbedtls_mpi_add_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     if( X != A )
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( X, A ) );
 
-    /*
-     * X should always be positive as a result of unsigned additions.
-     */
-    X->s = 1;
+    /* X is always positive as a result of unsigned additions. */
+    set_sign( X, 1 );
 
     for( j = B->n; j > 0; j-- )
         if( B->p[j - 1] != 0 )
@@ -1266,10 +1270,8 @@ int mbedtls_mpi_sub_abs( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     if( X != A )
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( X, A ) );
 
-    /*
-     * X should always be positive as a result of unsigned subtractions.
-     */
-    X->s = 1;
+    /* X is always positive since A > B. */
+    set_sign( X, 1 );
 
     ret = 0;
 
@@ -1495,7 +1497,7 @@ int mbedtls_mpi_mul_mpi( mbedtls_mpi *X, const mbedtls_mpi *A, const mbedtls_mpi
     for( ; j > 0; j-- )
         mpi_mul_hlp( i, A->p, X->p + j - 1, B->p[j - 1] );
 
-    X->s = A->s * B->s;
+    set_sign( X, get_sign( A ) * get_sign( B ) );
 
 cleanup:
 
@@ -1514,7 +1516,7 @@ int mbedtls_mpi_mul_int( mbedtls_mpi *X, const mbedtls_mpi *A, mbedtls_mpi_uint 
     MPI_VALIDATE_RET( X != NULL );
     MPI_VALIDATE_RET( A != NULL );
 
-    _B.s = 1;
+    set_sign( &_B, 1 );
     _B.n = 1;
     _B.p = p;
     p[0] = b;
@@ -1645,7 +1647,8 @@ int mbedtls_mpi_div_mpi( mbedtls_mpi *Q, mbedtls_mpi *R, const mbedtls_mpi *A,
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &X, A ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_copy( &Y, B ) );
-    X.s = Y.s = 1;
+    set_sign( &X, 1 );
+    set_sign( &Y, 1 );
 
     MBEDTLS_MPI_CHK( mbedtls_mpi_grow( &Z, A->n + 2 ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_lset( &Z,  0 ) );
@@ -1715,13 +1718,13 @@ int mbedtls_mpi_div_mpi( mbedtls_mpi *Q, mbedtls_mpi *R, const mbedtls_mpi *A,
     if( Q != NULL )
     {
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( Q, &Z ) );
-        Q->s = A->s * B->s;
+        set_sign( Q, get_sign( A ) * get_sign( B ) );
     }
 
     if( R != NULL )
     {
         MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &X, k ) );
-        X.s = A->s;
+        set_sign( &X, get_sign( A ) );
         MBEDTLS_MPI_CHK( mbedtls_mpi_copy( R, &X ) );
 
         if( mbedtls_mpi_cmp_int( R, 0 ) == 0 )
@@ -1832,7 +1835,7 @@ int mbedtls_mpi_mod_int( mbedtls_mpi_uint *r, const mbedtls_mpi *A, mbedtls_mpi_
      * If A is negative, then the current y represents a negative value.
      * Flipping it to the positive side.
      */
-    if( A->s < 0 && y != 0 )
+    if( get_sign( A ) < 0 && y != 0 )
         y = b - y;
 
     *r = y;
@@ -1909,7 +1912,8 @@ static int mpi_montred( mbedtls_mpi *A, const mbedtls_mpi *N,
     mbedtls_mpi_uint z = 1;
     mbedtls_mpi U;
 
-    U.n = U.s = (int) z;
+    set_sign( &U, 1 );
+    U.n = 1;
     U.p = &z;
 
     return( mpi_montmul( A, &U, N, mm, T ) );
@@ -2159,7 +2163,8 @@ int mbedtls_mpi_gcd( mbedtls_mpi *G, const mbedtls_mpi *A, const mbedtls_mpi *B 
     MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &TA, lz ) );
     MBEDTLS_MPI_CHK( mbedtls_mpi_shift_r( &TB, lz ) );
 
-    TA.s = TB.s = 1;
+    set_sign( &TA, 1 );
+    set_sign( &TB, 1 );
 
     while( mbedtls_mpi_cmp_int( &TA, 0 ) != 0 )
     {
@@ -2491,7 +2496,7 @@ int mbedtls_mpi_is_prime_ext( const mbedtls_mpi *X, int rounds,
     MPI_VALIDATE_RET( X     != NULL );
     MPI_VALIDATE_RET( f_rng != NULL );
 
-    XX.s = 1;
+    set_sign( &XX, 1 );
     XX.n = X->n;
     XX.p = X->p;
 
