@@ -989,8 +989,10 @@ static psa_hash_operation_t psa_hash_operation_init(void);
  *
  * \retval #PSA_SUCCESS
  *         Success.
+ * \retval #PSA_ERROR_INVALID_ARGUMENT
+ *         \p alg is not a hash algorithm.
  * \retval #PSA_ERROR_NOT_SUPPORTED
- *         \p alg is not supported or is not a hash algorithm.
+ *         \p alg is not a supported hash algorithm.
  * \retval #PSA_ERROR_BAD_STATE
  *         The operation state is not valid (already set up and not
  *         subsequently completed).
@@ -1932,6 +1934,14 @@ psa_status_t psa_cipher_update(psa_cipher_operation_t *operation,
  *
  * \retval #PSA_SUCCESS
  *         Success.
+ * \retval #PSA_ERROR_INVALID_ARGUMENT
+ *         The total input size passed to this operation is not valid for
+ *         this particular algorithm. For example, the algorithm is a based
+ *         on block cipher and requires a whole number of blocks, but the
+ *         total input size is not a multiple of the block size.
+ * \retval #PSA_ERROR_INVALID_PADDING
+ *         This is a decryption operation for an algorithm that includes
+ *         padding, and the ciphertext does not contain valid padding.
  * \retval #PSA_ERROR_BAD_STATE
  *         The operation state is not valid (not set up, IV required but
  *         not set, or already completed).
@@ -2678,6 +2688,7 @@ psa_status_t psa_aead_abort(psa_aead_operation_t *operation);
  *                              that make up the returned signature value.
  *
  * \retval #PSA_SUCCESS
+ * \retval #PSA_ERROR_NOT_PERMITTED
  * \retval #PSA_ERROR_BUFFER_TOO_SMALL
  *         The size of the \p signature buffer is too small. You can
  *         determine a sufficient buffer size by calling
@@ -2728,6 +2739,7 @@ psa_status_t psa_asymmetric_sign(psa_key_handle_t handle,
  * \retval #PSA_ERROR_INVALID_SIGNATURE
  *         The calculation was perfomed successfully, but the passed
  *         signature is not a valid signature.
+ * \retval #PSA_ERROR_NOT_PERMITTED
  * \retval #PSA_ERROR_NOT_SUPPORTED
  * \retval #PSA_ERROR_INVALID_ARGUMENT
  * \retval #PSA_ERROR_INSUFFICIENT_MEMORY
@@ -2775,6 +2787,7 @@ psa_status_t psa_asymmetric_verify(psa_key_handle_t handle,
  *                              that make up the returned output.
  *
  * \retval #PSA_SUCCESS
+ * \retval #PSA_ERROR_NOT_PERMITTED
  * \retval #PSA_ERROR_BUFFER_TOO_SMALL
  *         The size of the \p output buffer is too small. You can
  *         determine a sufficient buffer size by calling
@@ -2831,6 +2844,7 @@ psa_status_t psa_asymmetric_encrypt(psa_key_handle_t handle,
  *                              that make up the returned output.
  *
  * \retval #PSA_SUCCESS
+ * \retval #PSA_ERROR_NOT_PERMITTED
  * \retval #PSA_ERROR_BUFFER_TOO_SMALL
  *         The size of the \p output buffer is too small. You can
  *         determine a sufficient buffer size by calling
