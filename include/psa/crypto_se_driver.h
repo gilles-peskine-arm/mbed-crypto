@@ -65,7 +65,7 @@ typedef struct {
      *
      * The size of this buffer is given by psa_drv_se_t::persistent_data_size
      * when the driver is registered, and this value is also recorded in the
-     * ::persistent_data_size field of this structure.
+     * psa_drv_se_context_t::persistent_data_size field of this structure.
      *
      * Before the driver is initialized for the first time, the content of
      * the persistent data is all-bits-zero. After a driver upgrade, if the
@@ -979,21 +979,26 @@ typedef struct {
     /** Function that allocates a slot for a key.
      *
      * The core calls this function to determine a slot number, then
-     * calls the actual creation function (such as ::p_import or
-     * ::p_generate).
+     * calls the actual creation function (such as
+     * psa_drv_se_key_management_t::p_import or
+     * psa_drv_se_key_management_t::p_generate).
      *
      * If this function succeeds, the next call that the core makes to the
-     * driver is either the creation function or ::p_destroy. Note that
+     * driver is either the creation function or
+     * psa_drv_se_key_management_t::p_destroy. Note that
      * if the platform is reset after this function returns, the core
-     * may either subsequently call ::p_destroy or may behave as if the
-     * last call to this function had not taken place.
+     * may either subsequently call psa_drv_se_key_management_t::p_destroy
+     * or may behave as if the last call to this function had not taken place.
      */
     psa_drv_se_allocate_key_t   p_allocate;
     /** Function that allocates a slot.
      *
-     * The core calls this function instead of ::p_allocate to create
+     * The core calls this function instead of
+     * psa_drv_se_key_management_t::p_allocate to create
      * a key in a specific slot. It then calls the actual creation function
-     * (such as ::p_import or ::p_generate) or ::p_destroy.
+     * (such as psa_drv_se_key_management_t::p_import or
+     * psa_drv_se_key_management_t::p_generate) or
+     * psa_drv_se_key_management_t::p_destroy.
      */
     psa_drv_se_check_key_slot_validity_t p_check_slot;
     /** Function that performs a key import operation */
