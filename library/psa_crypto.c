@@ -1105,6 +1105,7 @@ psa_status_t psa_get_key_attributes( psa_key_handle_t handle,
     if( psa_get_se_driver( slot->lifetime, &drv, NULL ) )
     {
         attributes->slot_number = slot->data.se.slot_number;
+        attributes->has_slot_number = 1;
     }
 #endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 
