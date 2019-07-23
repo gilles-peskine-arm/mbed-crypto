@@ -898,7 +898,7 @@ typedef psa_status_t (*psa_drv_se_export_key_t)(psa_drv_se_context_t *drv_contex
  * \brief A function that generates a symmetric or asymmetric key on a secure
  * element
  *
- * If \p type is asymmetric (`#PSA_KEY_TYPE_IS_ASYMMETRIC(\p type) == 1`),
+ * If \p type is asymmetric (#PSA_KEY_TYPE_IS_ASYMMETRIC(\p type) = 1),
  * the public component of the generated key will be placed in `p_pubkey_out`.
  * The format of the public key information will match the format specified for
  * the psa_export_key() function for the key type.
