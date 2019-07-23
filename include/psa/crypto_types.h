@@ -81,9 +81,12 @@ typedef uint16_t psa_dh_group_t;
  */
 typedef uint32_t psa_algorithm_t;
 
+/** \brief Encoding of the step of a key derivation. */
+typedef uint16_t psa_key_derivation_step_t;
+
 /**@}*/
 
-/** \defgroup key_lifetimes Key lifetimes
+/** \addtogroup attributes
  * @{
  */
 
@@ -122,23 +125,8 @@ typedef uint32_t psa_key_lifetime_t;
 typedef uint32_t psa_key_id_t;
 #endif
 
-/**@}*/
-
-/** \defgroup policy Key policies
- * @{
- */
-
 /** \brief Encoding of permitted usage on a key. */
 typedef uint32_t psa_key_usage_t;
-
-/**@}*/
-
-/** \defgroup derivation Key derivation
- * @{
- */
-
-/** \brief Encoding of the step of a key derivation. */
-typedef uint16_t psa_key_derivation_step_t;
 
 /**@}*/
 
