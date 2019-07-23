@@ -193,3 +193,19 @@ The layout of a key file is:
 * key material length (4 bytes)
 * key material: output of `psa_export_key`
 * Any trailing data is rejected on load.
+
+Mbed Crypto TBD
+---------------
+
+Tags: TBD
+
+Released in May 2019. <br>
+Integrated in Mbed OS 5.13.
+
+### Changes introduced in TBD
+
+### Key file format for TBD
+
+### File namespace on a PSA platform for TBD
+
+### File namespace on ITS as a library for TBD
