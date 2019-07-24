@@ -1536,8 +1536,8 @@ static psa_status_t psa_finish_key_creation(
         if( driver != NULL )
         {
             status = psa_save_persistent_key( &attributes,
-                                              (uint8_t*) &slot->data.se.slot_number,
-                                              sizeof( slot->data.se.slot_number ) );
+                                              (uint8_t*) &slot->data.se,
+                                              sizeof( slot->data.se ) );
         }
         else
 #endif /* MBEDTLS_PSA_CRYPTO_SE_C */
