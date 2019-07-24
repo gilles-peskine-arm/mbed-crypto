@@ -499,6 +499,8 @@ void key_creation_import_export( int min_slot, int restart )
     TEST_ASSERT( ram_slots[min_slot].type == PSA_KEY_TYPE_RAW_DATA );
 
     /* Test the key attributes and the key data. */
+    psa_set_key_bits( &attributes,
+                      PSA_BYTES_TO_BITS( sizeof( key_material ) ) );
     psa_set_key_slot_number( &attributes, min_slot );
     if( ! check_key_attributes( handle, &attributes ) )
         goto exit;
@@ -564,11 +566,18 @@ void key_creation_in_chosen_slot( int slot_arg,
         /* Test that the key was created in the expected slot. */
         TEST_EQUAL( ram_slots[wanted_slot].type, PSA_KEY_TYPE_RAW_DATA );
 
-        /* Test that the key is reported as being in the expected slot. */
-        PSA_ASSERT( psa_get_key_attributes( handle, &attributes ) );
-        TEST_EQUAL( psa_get_key_slot_number( &attributes ), wanted_slot );
+        /* Test that the key is reported with the expected attributes,
+         * including the expected slot number (set above). */
+        psa_set_key_bits( &attributes,
+                          PSA_BYTES_TO_BITS( sizeof( key_material ) ) );
+        if( ! check_key_attributes( handle, &attributes ) )
+            goto exit;
 
         PSA_ASSERT( psa_destroy_key( handle ) );
+
+        /* Test that psa_reset_key_attributes resets the slot number field. */
+        psa_reset_key_attributes( &attributes );
+        TEST_EQUAL( psa_get_key_slot_number( &attributes ), 0 );
     }
 
 exit:
