@@ -1528,59 +1528,57 @@ static psa_status_t psa_finish_key_creation(
 #if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
     if( slot->lifetime != PSA_KEY_LIFETIME_VOLATILE )
     {
-        uint8_t *buffer = NULL;
-        size_t buffer_size = 0;
-        size_t length = 0;
+        psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+
+        psa_get_key_slot_attributes( slot, &attributes );
 
 #if defined(MBEDTLS_PSA_CRYPTO_SE_C)
         if( driver != NULL )
         {
-            buffer = (uint8_t*) &slot->data.se.slot_number;
-            length = sizeof( slot->data.se.slot_number );
+            status = psa_save_persistent_key( &attributes,
+                                              (uint8_t*) &slot->data.se.slot_number,
+                                              sizeof( slot->data.se.slot_number ) );
         }
         else
 #endif /* MBEDTLS_PSA_CRYPTO_SE_C */
         {
+            size_t buffer_size = 0;
+            uint8_t *buffer = NULL;
+            size_t length = 0;
             buffer_size = PSA_KEY_EXPORT_MAX_SIZE( slot->type,
                                                    psa_get_key_slot_bits( slot ) );
-            buffer = mbedtls_calloc( 1, buffer_size );
-            if( buffer == NULL && buffer_size != 0 )
-                return( PSA_ERROR_INSUFFICIENT_MEMORY );
+            if( buffer_size != 0 )
+            {
+                buffer = mbedtls_calloc( 1, buffer_size );
+                if( buffer == NULL )
+                    return( PSA_ERROR_INSUFFICIENT_MEMORY );
+            }
             status = psa_internal_export_key( slot,
                                               buffer, buffer_size, &length,
                                               0 );
-        }
-
-        if( status == PSA_SUCCESS )
-        {
-            psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
-            psa_get_key_slot_attributes( slot, &attributes );
-            status = psa_save_persistent_key( &attributes, buffer, length );
-        }
-
-#if defined(MBEDTLS_PSA_CRYPTO_SE_C)
-        if( driver == NULL )
-#endif /* MBEDTLS_PSA_CRYPTO_SE_C */
-        {
+            if( status == PSA_SUCCESS )
+                status = psa_save_persistent_key( &attributes, buffer, length );
             if( buffer_size != 0 )
+            {
                 mbedtls_platform_zeroize( buffer, buffer_size );
-            mbedtls_free( buffer );
+                mbedtls_free( buffer );
+            }
         }
     }
+    if( status != PSA_SUCCESS )
+        return( status );
 #endif /* defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) */
 
 #if defined(MBEDTLS_PSA_CRYPTO_SE_C)
     if( driver != NULL )
     {
         status = psa_save_se_persistent_data( driver );
+        if( status == PSA_SUCCESS )
+            status = psa_crypto_stop_transaction( );
+        /* In case of failure, psa_fail_key_creation will take care of
+         * stopping the transaction. */
         if( status != PSA_SUCCESS )
-        {
             psa_destroy_persistent_key( slot->persistent_storage_id );
-            return( status );
-        }
-        status = psa_crypto_stop_transaction( );
-        if( status != PSA_SUCCESS )
-            return( status );
     }
 #endif /* MBEDTLS_PSA_CRYPTO_SE_C */
 
