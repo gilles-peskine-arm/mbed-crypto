@@ -1505,16 +1505,22 @@ static psa_status_t psa_validate_key_attributes(
     return( PSA_SUCCESS );
 }
 
-/** An enumeration indicating how a key is created.
+#if !defined(MBEDTLS_PSA_CRYPTO_SE_C)
+/* Key creation methods only make a difference in this module when
+ * secure element support is enabled. To avoid cluttering the code
+ * with too many #ifdef, we do use the type, and since crypto_se_driver.h
+ * is not #include'd, we need to define it. The type does not need to
+ * be compatible with the definition in crypto_se_driver.h, it just
+ * needs to be sufficient to get the code to build. So do something
+ * that gives compilers a chance of optimizing the variables of this type
+ * away: give all constants the same value.
  */
-typedef enum
-{
-    PSA_KEY_CREATION_IMPORT,
-    PSA_KEY_CREATION_GENERATE,
-    PSA_KEY_CREATION_DERIVE,
-    PSA_KEY_CREATION_COPY,
-    PSA_KEY_CREATION_REGISTER,
-} psa_key_creation_method_t;
+#define PSA_KEY_CREATION_IMPORT 0
+#define PSA_KEY_CREATION_GENERATE 0
+#define PSA_KEY_CREATION_DERIVE 0
+#define PSA_KEY_CREATION_COPY 0
+typedef int psa_key_creation_method_t;
+#endif /* !MBEDTLS_PSA_CRYPTO_SE_C */
 
 /** Prepare a key slot to receive key material.
  *
@@ -1592,7 +1598,7 @@ static psa_status_t psa_start_key_creation(
      * we can roll back to a state where the key doesn't exist. */
     if( *p_drv != NULL && method != PSA_KEY_CREATION_REGISTER )
     {
-        status = psa_find_se_slot_for_key( attributes, *p_drv,
+        status = psa_find_se_slot_for_key( attributes, method, *p_drv,
                                            &slot->data.se.slot_number );
         if( status != PSA_SUCCESS )
             return( status );
