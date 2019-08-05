@@ -810,12 +810,23 @@ typedef struct {
  */
 /**@{*/
 
+/** An enumeration indicating how a key is created.
+ */
+typedef enum
+{
+    PSA_KEY_CREATION_IMPORT, /**< During psa_import_key() */
+    PSA_KEY_CREATION_GENERATE, /**< During psa_generate_key() */
+    PSA_KEY_CREATION_DERIVE, /**< During psa_key_derivation_output_key() */
+    PSA_KEY_CREATION_COPY, /**< During psa_copy_key() */
+} psa_key_creation_method_t;
+
 /** \brief A function that allocates a slot for a key.
  *
  * \param[in,out] drv_context       The driver context structure.
  * \param[in,out] persistent_data   A pointer to the persistent data
  *                                  that allows writing.
  * \param[in] attributes            Attributes of the key.
+ * \param method                    The way in which the key is being created.
  * \param[out] key_slot             Slot where the key will be stored.
  *                                  This must be a valid slot for a key of the
  *                                  chosen type. It must be unoccupied.
@@ -831,14 +842,16 @@ typedef psa_status_t (*psa_drv_se_allocate_key_t)(
     psa_drv_se_context_t *drv_context,
     void *persistent_data,
     const psa_key_attributes_t *attributes,
+    psa_key_creation_method_t method,
     psa_key_slot_number_t *key_slot);
 
 /** \brief A function that determines whether a slot number is valid
  * for a key.
  *
- * \param[in,out] drv_context       The driver context structure.
- * \param[in] attributes    Attributes of the key.
- * \param[in] key_slot      Slot where the key is to be stored.
+ * \param[in,out] drv_context   The driver context structure.
+ * \param[in] attributes        Attributes of the key.
+ * \param method                The way in which the key is being created.
+ * \param[in] key_slot          Slot where the key is to be stored.
  *
  * \retval #PSA_SUCCESS
  *         The given slot number is valid for a key with the given
@@ -855,6 +868,7 @@ typedef psa_status_t (*psa_drv_se_allocate_key_t)(
 typedef psa_status_t (*psa_drv_se_validate_slot_number_t)(
     psa_drv_se_context_t *drv_context,
     const psa_key_attributes_t *attributes,
+    psa_key_creation_method_t method,
     psa_key_slot_number_t key_slot);
 
 /** \brief A function that imports a key into a secure element in binary format
@@ -1004,9 +1018,12 @@ typedef struct {
     /** Function that allocates a slot for a key.
      *
      * The core calls this function to determine a slot number, then
-     * calls the actual creation function (such as
-     * psa_drv_se_key_management_t::p_import or
-     * psa_drv_se_key_management_t::p_generate).
+     * calls the actual creation function. The `method` parameter passed
+     * to this function indicates which creation function is called next:
+     * - #PSA_KEY_CREATION_IMPORT is followed by psa_drv_se_key_management_t::p_import
+     * - #PSA_KEY_CREATION_GENERATE is followed by psa_drv_se_key_management_t::p_generate
+     * - #PSA_KEY_CREATION_DERIVE is followed by psa_drv_se_key_derivation_t::p_derive
+     * - #PSA_KEY_CREATION_COPY is followed by psa_drv_se_key_management_t::p_export
      *
      * If this function succeeds, the next call that the core makes to the
      * driver is either the creation function or
@@ -1022,9 +1039,7 @@ typedef struct {
      * The core calls this function instead of
      * psa_drv_se_key_management_t::p_allocate to create
      * a key in a specific slot. It then calls the actual creation function
-     * (such as psa_drv_se_key_management_t::p_import or
-     * psa_drv_se_key_management_t::p_generate) or
-     * psa_drv_se_key_management_t::p_destroy.
+     * as for `p_allocate`.
      */
     psa_drv_se_validate_slot_number_t p_validate_slot_number;
     /** Function that performs a key import operation */
