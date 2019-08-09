@@ -846,7 +846,7 @@ typedef psa_status_t (*psa_drv_se_allocate_key_t)(
  *                              psa_get_key_algorithm() to access this
  *                              information.
  * \param[in] data              Buffer containing the key data.
- * \param[in] data_length       Size of the `data` buffer in bytes.
+ * \param[in] data_length       Size of the \p data buffer in bytes.
  * \param[out] bits             On success, the key size in bits. The driver
  *                              must determine this value after parsing the
  *                              key according to the key type.
@@ -933,7 +933,7 @@ typedef psa_status_t (*psa_drv_se_export_key_t)(psa_drv_se_context_t *drv_contex
  * to the \p pubkey buffer.
  * This is optional, intended for secure elements that output the
  * public key at generation time and that cannot export the public key
- * later. Drivers that do not  need this feature should leave
+ * later. Drivers that do not need this feature should leave
  * \p *pubkey_length set to 0 and should
  * implement the psa_drv_key_management_t::p_export_public function.
  * Some implementations do not support this feature, in which case
