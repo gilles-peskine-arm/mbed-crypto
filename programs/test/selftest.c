@@ -94,7 +94,7 @@ static int calloc_self_test( int verbose )
      * default; to avoid this, set the environment variable
      * ASAN_OPTIONS=allocator_may_return_null=1 when running this program.
      */
-    void *overflow = mbedtls_calloc( SIZE_MAX / 2 + 1, 2 );
+    void *overflow = mbedtls_calloc( SIZE_MAX / 4 + 1, 4 );
     uintptr_t old_buffer1;
 
     if( empty1 == NULL && empty2 == NULL )
