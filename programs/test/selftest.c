@@ -79,6 +79,7 @@
 #endif
 
 
+#if defined MBEDTLS_SELF_TEST
 /* Sanity check for malloc. This is not expected to fail, and is rather
  * intended to display potentially useful information about the platform,
  * in particular the behavior of malloc(0). */
@@ -175,6 +176,7 @@ static int calloc_self_test( int verbose )
     mbedtls_free( overflow );
     return( failures );
 }
+#endif /* MBEDTLS_SELF_TEST */
 
 static int test_snprintf( size_t n, const char ref_buf[10], int ref_ret )
 {
