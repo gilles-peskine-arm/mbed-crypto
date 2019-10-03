@@ -319,26 +319,32 @@ void mbedtls_ctr_drbg_update( mbedtls_ctr_drbg_context *ctx,
 #endif /* MBEDTLS_DEPRECATED_REMOVED */
 
 /* CTR_DRBG_Reseed with derivation function (SP 800-90A &sect;10.2.1.4.2)
- * mbedtls_ctr_drbg_reseed(ctx, additional, len)
+ * mbedtls_ctr_drbg_reseed(ctx, nonce, nonce_len, perso, perso_len)
  * implements
  * CTR_DRBG_Reseed(working_state, entropy_input, additional_input)
  *                -> new_working_state
  * with inputs
  *   ctx contains working_state
- *   additional[:len] = additional_input
+ *   nonce[:nonce_len] + perso[:perso_len] = additional_input
  * and entropy_input comes from calling ctx->f_entropy
+ * and nonce comes from calling ctx->f_entropy if (nonce==NULL && nonce_len!=0)
  * and with output
  *   ctx contains new_working_state
  */
-int mbedtls_ctr_drbg_reseed( mbedtls_ctr_drbg_context *ctx,
-                     const unsigned char *additional, size_t len )
+static int mbedtls_ctr_drbg_seed_or_reseed(
+    mbedtls_ctr_drbg_context *ctx,
+    const unsigned char *nonce, size_t nonce_len,
+    const unsigned char *perso, size_t perso_len )
 {
     unsigned char seed[MBEDTLS_CTR_DRBG_MAX_SEED_INPUT];
     size_t seedlen = 0;
     int ret;
 
-    if( ctx->entropy_len > MBEDTLS_CTR_DRBG_MAX_SEED_INPUT ||
-        len > MBEDTLS_CTR_DRBG_MAX_SEED_INPUT - ctx->entropy_len )
+    if( ctx->entropy_len > MBEDTLS_CTR_DRBG_MAX_SEED_INPUT )
+        return( MBEDTLS_ERR_CTR_DRBG_INPUT_TOO_BIG );
+    if( nonce_len > MBEDTLS_CTR_DRBG_MAX_SEED_INPUT - ctx->entropy_len )
+        return( MBEDTLS_ERR_CTR_DRBG_INPUT_TOO_BIG );
+    if( perso_len > MBEDTLS_CTR_DRBG_MAX_SEED_INPUT - ctx->entropy_len - nonce_len )
         return( MBEDTLS_ERR_CTR_DRBG_INPUT_TOO_BIG );
 
     memset( seed, 0, MBEDTLS_CTR_DRBG_MAX_SEED_INPUT );
@@ -346,21 +352,37 @@ int mbedtls_ctr_drbg_reseed( mbedtls_ctr_drbg_context *ctx,
     /*
      * Gather entropy_len bytes of entropy to seed state
      */
-    if( 0 != ctx->f_entropy( ctx->p_entropy, seed,
-                             ctx->entropy_len ) )
+    if( 0 != ctx->f_entropy( ctx->p_entropy, seed, ctx->entropy_len ) )
     {
         return( MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED );
     }
-
     seedlen += ctx->entropy_len;
 
     /*
-     * Add additional data
+     * Gather nonce_len bytes of entropy for the nonce if requested
      */
-    if( additional && len )
+    if( nonce_len > 0 )
     {
-        memcpy( seed + seedlen, additional, len );
-        seedlen += len;
+        if( nonce != NULL )
+        {
+            memcpy( seed + seedlen, nonce, nonce_len );
+        }
+        else
+        {
+            ret = ctx->f_entropy( ctx->p_entropy, seed + seedlen, nonce_len );
+            if( ret != 0 )
+                return( MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED );
+        }
+        seedlen += nonce_len;
+    }
+
+    /*
+     * Add personalization string
+     */
+    if( perso != NULL && perso_len != 0 )
+    {
+        memcpy( seed + seedlen, perso, perso_len );
+        seedlen += perso_len;
     }
 
     /*
@@ -381,23 +403,31 @@ exit:
     return( ret );
 }
 
+int mbedtls_ctr_drbg_reseed(
+    mbedtls_ctr_drbg_context *ctx,
+    const unsigned char *additional, size_t len )
+{
+    return( mbedtls_ctr_drbg_seed_or_reseed( ctx, NULL, 0, additional, len ) );
+}
+
 /* CTR_DRBG_Instantiate with derivation function (SP 800-90A &sect;10.2.1.3.2)
- * mbedtls_ctr_drbg_seed_entropy_len(ctx, f_entropy, p_entropy,
- *                                   custom, len, entropy_len)
+ * mbedtls_ctr_drbg_seed_with_nonce(ctx, f_entropy, p_entropy,
+ *                                  nonce, nonce_len, perso, perso_len)
  * implements
  * CTR_DRBG_Instantiate(entropy_input, nonce, personalization_string,
  *                      security_strength) -> initial_working_state
  * with inputs
- *   custom[:len] = nonce || personalization_string
+ *   nonce[:nonce_len] = nonce if nonce != NULL
+ *   perso[:perso_len] = || personalization_string
  * where entropy_input comes from f_entropy for entropy_len bytes
+ * and nonce comes from f_entropy for nonce_len bytes if nonce==NULL
  * and with outputs
  *   ctx = initial_working_state
  */
-int mbedtls_ctr_drbg_seed( mbedtls_ctr_drbg_context *ctx,
-                           int (*f_entropy)(void *, unsigned char *, size_t),
-                           void *p_entropy,
-                           const unsigned char *custom,
-                           size_t len )
+static int mbedtls_ctr_drbg_setup(
+    mbedtls_ctr_drbg_context *ctx,
+    int (*f_entropy)(void *, unsigned char *, size_t),
+    void *p_entropy )
 {
     int ret;
     unsigned char key[MBEDTLS_CTR_DRBG_KEYSIZE];
@@ -422,10 +452,43 @@ int mbedtls_ctr_drbg_seed( mbedtls_ctr_drbg_context *ctx,
         return( ret );
     }
 
-    if( ( ret = mbedtls_ctr_drbg_reseed( ctx, custom, len ) ) != 0 )
-    {
+    return( 0 );
+}
+
+int mbedtls_ctr_drbg_seed_with_nonce(
+    mbedtls_ctr_drbg_context *ctx,
+    int (*f_entropy)(void *, unsigned char *, size_t),
+    void *p_entropy,
+    const unsigned char *nonce, size_t nonce_len,
+    const unsigned char *perso, size_t perso_len )
+{
+    int ret;
+    ret = mbedtls_ctr_drbg_setup( ctx, f_entropy, p_entropy );
+    if( ret != 0 )
         return( ret );
-    }
+    ret = mbedtls_ctr_drbg_seed_or_reseed( ctx,
+                                           nonce, nonce_len,
+                                           perso, perso_len );
+    if( ret != 0 )
+        return( ret );
+    return( 0 );
+}
+
+int mbedtls_ctr_drbg_seed(
+    mbedtls_ctr_drbg_context *ctx,
+    int (*f_entropy)(void *, unsigned char *, size_t),
+    void *p_entropy,
+    const unsigned char *custom, size_t len )
+{
+    int ret;
+    ret = mbedtls_ctr_drbg_setup( ctx, f_entropy, p_entropy );
+    if( ret != 0 )
+        return( ret );
+    ret = mbedtls_ctr_drbg_seed_or_reseed( ctx,
+                                           NULL, ( ctx->entropy_len + 1 ) / 2,
+                                           custom, len );
+    if( ret != 0 )
+        return( ret );
     return( 0 );
 }
 
@@ -693,10 +756,11 @@ int mbedtls_ctr_drbg_self_test( int verbose )
 
     test_offset = 0;
     mbedtls_ctr_drbg_set_entropy_len( &ctx, 32 );
-    CHK( mbedtls_ctr_drbg_seed( &ctx,
-                                ctr_drbg_self_test_entropy,
-                                (void *) entropy_source_pr,
-                                nonce_pers_pr, 16 ) );
+    CHK( mbedtls_ctr_drbg_seed_with_nonce( &ctx,
+                                           ctr_drbg_self_test_entropy,
+                                           (void *) entropy_source_pr,
+                                           nonce_pers_pr, 16,
+                                           NULL, 0 ) );
     mbedtls_ctr_drbg_set_prediction_resistance( &ctx, MBEDTLS_CTR_DRBG_PR_ON );
     CHK( mbedtls_ctr_drbg_random( &ctx, buf, MBEDTLS_CTR_DRBG_BLOCKSIZE ) );
     CHK( mbedtls_ctr_drbg_random( &ctx, buf, MBEDTLS_CTR_DRBG_BLOCKSIZE ) );
@@ -717,10 +781,11 @@ int mbedtls_ctr_drbg_self_test( int verbose )
 
     test_offset = 0;
     mbedtls_ctr_drbg_set_entropy_len( &ctx, 32 );
-    CHK( mbedtls_ctr_drbg_seed( &ctx,
-                                ctr_drbg_self_test_entropy,
-                                (void *) entropy_source_nopr,
-                                nonce_pers_nopr, 16 ) );
+    CHK( mbedtls_ctr_drbg_seed_with_nonce( &ctx,
+                                           ctr_drbg_self_test_entropy,
+                                           (void *) entropy_source_nopr,
+                                           nonce_pers_nopr, 16,
+                                           NULL, 0 ) );
     CHK( mbedtls_ctr_drbg_random( &ctx, buf, 16 ) );
     CHK( mbedtls_ctr_drbg_reseed( &ctx, NULL, 0 ) );
     CHK( mbedtls_ctr_drbg_random( &ctx, buf, 16 ) );
