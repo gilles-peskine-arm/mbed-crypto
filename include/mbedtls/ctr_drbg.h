@@ -10,32 +10,19 @@
  * Bit Generators</em>.
  *
  * The Mbed TLS implementation of CTR_DRBG uses AES-256 (default) or AES-128
- * (if \c MBEDTLS_CTR_DRBG_USE_128_BIT_KEY is enabled at compile time)
- * as the underlying block cipher, with a derivation function.
- * The initial seeding grabs #MBEDTLS_CTR_DRBG_ENTROPY_LEN bytes of entropy.
- * See the documentation of mbedtls_ctr_drbg_seed() for more details.
- *
- * Based on NIST SP 800-90A §10.2.1 table 3 and NIST SP 800-57 part 1 table 2,
- * here are the security strengths achieved in typical configuration:
- * - 256 bits under the default configuration of the library, with AES-256
- *   and with #MBEDTLS_CTR_DRBG_ENTROPY_LEN set to 48 or more.
- * - 256 bits if AES-256 is used, #MBEDTLS_CTR_DRBG_ENTROPY_LEN is set
- *   to 32 or more, and the DRBG is initialized with an explicit
- *   nonce in the \c custom parameter to mbedtls_ctr_drbg_seed().
- * - 128 bits if AES-256 is used but #MBEDTLS_CTR_DRBG_ENTROPY_LEN is
- *   between 24 and 47 and the DRBG is not initialized with an explicit
- *   nonce (see mbedtls_ctr_drbg_seed()).
- * - 128 bits if AES-128 is used (\c MBEDTLS_CTR_DRBG_USE_128_BIT_KEY set)
- *   and #MBEDTLS_CTR_DRBG_ENTROPY_LEN is set to 24 or more (which is
- *   always the case unless it is explicitly set to a different value
- *   in config.h).
+ * (if #MBEDTLS_CTR_DRBG_USE_128_BIT_KEY is enabled at compile time)
+ * as the underlying block cipher, with a derivation function. The security
+ * strength is the smaller of the AES key size and the entropy length.
  *
  * Note that the value of #MBEDTLS_CTR_DRBG_ENTROPY_LEN defaults to:
- * - \c 48 if the module \c MBEDTLS_SHA512_C is enabled and the symbol
- *   \c MBEDTLS_ENTROPY_FORCE_SHA256 is disabled at compile time.
+ * - \c 48 bytes if the module #MBEDTLS_SHA512_C is enabled and the symbol
+ *   #MBEDTLS_ENTROPY_FORCE_SHA256 is not enabled at compile time.
  *   This is the default configuration of the library.
- * - \c 32 if the module \c MBEDTLS_SHA512_C is disabled at compile time.
- * - \c 32 if \c MBEDTLS_ENTROPY_FORCE_SHA256 is enabled at compile time.
+ * - \c 32 bytes if the module #MBEDTLS_SHA512_C is disabled at compile time.
+ * - \c 32 bytes if #MBEDTLS_ENTROPY_FORCE_SHA256 is enabled at compile time.
+ *
+ * This is always sufficient to reach the maximum security strength that can
+ * be achieved given the AES key size.
  */
 /*
  *  Copyright (C) 2006-2019, Arm Limited (or its affiliates), All Rights Reserved
@@ -123,14 +110,15 @@
  * (the SHA512 module is disabled or
  * \c MBEDTLS_ENTROPY_FORCE_SHA256 is enabled).
  */
-#if !defined(MBEDTLS_CTR_DRBG_USE_128_BIT_KEY)
-/** \warning To achieve a 256-bit security strength, you must pass a nonce
- *           to mbedtls_ctr_drbg_seed().
- */
-#endif /* !defined(MBEDTLS_CTR_DRBG_USE_128_BIT_KEY) */
 #define MBEDTLS_CTR_DRBG_ENTROPY_LEN        32
 #endif /* defined(MBEDTLS_SHA512_C) && !defined(MBEDTLS_ENTROPY_FORCE_SHA256) */
 #endif /* !defined(MBEDTLS_CTR_DRBG_ENTROPY_LEN) */
+
+/** The length of the nonce for the initial seeding.
+ *
+ * This implementation always reads a nonce from the entropy source.
+ */
+#define MBEDTLS_CTR_DRBG_NONCE_LEN (MBEDTLS_CTR_DRBG_ENTROPY_LEN / 2)
 
 #if !defined(MBEDTLS_CTR_DRBG_RESEED_INTERVAL)
 #define MBEDTLS_CTR_DRBG_RESEED_INTERVAL    10000
@@ -214,41 +202,23 @@ void mbedtls_ctr_drbg_init( mbedtls_ctr_drbg_context *ctx );
  *   with mbedtls_entropy_init() (which registers the platform's default
  *   entropy sources).
  *
- * \p f_entropy is always called with a buffer size equal to the entropy
+ * \p f_entropy is always called with a buffer size less or equal to the entropy
  * length. The entropy length is initially #MBEDTLS_CTR_DRBG_ENTROPY_LEN
  * and can be changed by calling mbedtls_ctr_drbg_set_entropy_len().
  *
  * You can provide a personalization string in addition to the
  * entropy source, to make this instantiation as unique as possible.
  *
- * \note                The _seed_material_ value passed to the derivation
- *                      function in the CTR_DRBG Instantiate Process
- *                      described in NIST SP 800-90A §10.2.1.3.2
- *                      is the concatenation of the string obtained from
- *                      calling \p f_entropy and the \p custom string.
- *                      The origin of the nonce depends on the value of
- *                      the entropy length relative to the security strength.
- *                      - If the entropy length is at least 1.5 times the
- *                        security strength then the nonce is taken from the
- *                        string obtained with \p f_entropy.
- *                      - If the entropy length is less than the security
- *                        strength, then the nonce is taken from \p custom.
- *                        In this case, for compliance with SP 800-90A,
- *                        you must pass a unique value of \p custom at
- *                        each invocation. See SP 800-90A §8.6.7 for more
- *                        details.
- */
-#if MBEDTLS_CTR_DRBG_ENTROPY_LEN < MBEDTLS_CTR_DRBG_KEYSIZE * 3 / 2
-/** \warning            When #MBEDTLS_CTR_DRBG_ENTROPY_LEN is less than
- *                      #MBEDTLS_CTR_DRBG_KEYSIZE * 3 / 2, to achieve the
- *                      maximum security strength permitted by CTR_DRBG,
- *                      you must pass a value of \p custom that is a nonce:
- *                      this value must never be repeated in subsequent
- *                      runs of the same application or on a different
- *                      device.
- */
-#endif
-/**
+ * The _seed_material_ value passed to the derivation
+ * function in the CTR_DRBG Instantiate Process
+ * described in NIST SP 800-90A §10.2.1.3.2
+ * is the concatenation of:
+ * - the entropy input, obtained by calling \p f_entropy for
+ *   #MBEDTLS_CTR_DRBG_ENTROPY_LEN bytes;
+ * - the nonce, obtained by calling \p f_entropy for
+ *   #MBEDTLS_CTR_DRBG_NONCE_LEN bytes;
+ * - the \p custom string.
+ *
  * \param ctx           The CTR_DRBG context to seed.
  * \param f_entropy     The entropy callback, taking as arguments the
  *                      \p p_entropy context, the buffer to fill, and the
@@ -261,6 +231,7 @@ void mbedtls_ctr_drbg_init( mbedtls_ctr_drbg_context *ctx );
  *                      This must be at most
  *                      #MBEDTLS_CTR_DRBG_MAX_SEED_INPUT
  *                      - #MBEDTLS_CTR_DRBG_ENTROPY_LEN.
+ *                      - #MBEDTLS_CTR_DRBG_NONCE_LEN.
  *
  * \return              \c 0 on success.
  * \return              #MBEDTLS_ERR_CTR_DRBG_ENTROPY_SOURCE_FAILED on failure.
@@ -300,22 +271,8 @@ void mbedtls_ctr_drbg_set_prediction_resistance( mbedtls_ctr_drbg_context *ctx,
  *
  * The default value is #MBEDTLS_CTR_DRBG_ENTROPY_LEN.
  *
- * \note                The security strength of CTR_DRBG is bounded by the
- *                      entropy length. Thus:
- *                      - When using AES-256
- *                        (\c MBEDTLS_CTR_DRBG_USE_128_BIT_KEY is disabled,
- *                        which is the default),
- *                        \p len must be at least 32 (in bytes)
- *                        to achieve a 256-bit strength.
- *                      - When using AES-128
- *                        (\c MBEDTLS_CTR_DRBG_USE_128_BIT_KEY is enabled)
- *                        \p len must be at least 16 (in bytes)
- *                        to achieve a 128-bit strength.
- *
- * \note                The initial seeding of the CTR_DRBG instance always
- *                      grabs #MBEDTLS_CTR_DRBG_ENTROPY_LEN bytes. See
- *                      the documentation of mbedtls_ctr_drbg_seed()
- *                      for more information.
+ * This function has no effect on the initial seeding,
+ * even if you call it before mbedtls_ctr_drbg_seed().
  *
  * \param ctx           The CTR_DRBG context.
  * \param len           The amount of entropy to grab, in bytes.
@@ -500,7 +457,7 @@ int mbedtls_ctr_drbg_self_test( int verbose );
 /* Internal functions (do not call directly) */
 int mbedtls_ctr_drbg_seed_entropy_len( mbedtls_ctr_drbg_context *,
                                int (*)(void *, unsigned char *, size_t), void *,
-                               const unsigned char *, size_t, size_t );
+                               const unsigned char *, size_t, size_t, size_t );
 
 #ifdef __cplusplus
 }
