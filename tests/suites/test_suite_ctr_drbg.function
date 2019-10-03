@@ -210,10 +210,11 @@ void ctr_drbg_entropy_usage(  )
     memset( out, 0, sizeof( out ) );
     memset( add, 0, sizeof( add ) );
 
-    /* Init must use entropy */
+    /* Init must use entropy for the entropy input and for the nonce. */
     last_idx = test_offset_idx;
     TEST_ASSERT( mbedtls_ctr_drbg_seed( &ctx, mbedtls_test_entropy_func, entropy, NULL, 0 ) == 0 );
-    TEST_ASSERT( last_idx < test_offset_idx );
+    TEST_EQUAL( test_offset_idx - last_idx,
+                MBEDTLS_CTR_DRBG_ENTROPY_LEN + MBEDTLS_CTR_DRBG_NONCE_LEN );
 
     /* By default, PR is off and reseed_interval is large,
      * so the next few calls should not use entropy */
@@ -257,7 +258,8 @@ void ctr_drbg_entropy_usage(  )
     /* Now enable PR, so the next few calls should all reseed */
     mbedtls_ctr_drbg_set_prediction_resistance( &ctx, MBEDTLS_CTR_DRBG_PR_ON );
     TEST_ASSERT( mbedtls_ctr_drbg_random( &ctx, out, sizeof( out ) ) == 0 );
-    TEST_ASSERT( last_idx < test_offset_idx );
+    TEST_EQUAL( test_offset_idx - last_idx,
+                MBEDTLS_CTR_DRBG_ENTROPY_LEN );
 
     /* Finally, check setting entropy_len */
     mbedtls_ctr_drbg_set_entropy_len( &ctx, 42 );
