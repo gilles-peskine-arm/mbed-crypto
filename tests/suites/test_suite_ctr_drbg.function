@@ -24,7 +24,7 @@ static int mbedtls_test_entropy_func( void *data, unsigned char *buf, size_t len
     return( 0 );
 }
 
-static void ctr_drbg_validate_internal( int reseed_mode, data_t * nonce,
+static void ctr_drbg_validate_internal( int reseed_mode, data_t * custom,
                         int entropy_len_arg, data_t * entropy,
                         data_t * reseed,
                         data_t * add1, data_t * add2,
@@ -45,10 +45,11 @@ static void ctr_drbg_validate_internal( int reseed_mode, data_t * nonce,
     /* CTR_DRBG_Instantiate(entropy[:entropy->len], nonce, perso, <ignored>)
      * where nonce||perso = nonce[nonce->len] */
     mbedtls_ctr_drbg_set_entropy_len( &ctx, entropy_chunk_len );
-    TEST_ASSERT( mbedtls_ctr_drbg_seed(
+    TEST_ASSERT( mbedtls_ctr_drbg_seed_with_nonce(
                      &ctx,
                      mbedtls_test_entropy_func, entropy->x,
-                     nonce->x, nonce->len ) == 0 );
+                     custom->x, custom->len,
+                     NULL, 0 ) == 0 );
     if( reseed_mode == RESEED_ALWAYS )
         mbedtls_ctr_drbg_set_prediction_resistance(
             &ctx,
