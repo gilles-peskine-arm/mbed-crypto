@@ -103,6 +103,23 @@ class Inputs:
             'tag_length': ['1', '63'],
         }
 
+    def discard_name(self, name):
+        """Discard the given name from all sets."""
+        for s in (
+                self.statuses,
+                self.algorithms,
+                self.ecc_curves,
+                self.dh_groups,
+                self.key_types,
+                self.key_usage_flags,
+                self.hash_algorithms,
+                self.mac_algorithms,
+                self.ka_algorithms,
+                self.kdf_algorithms,
+                self.aead_algorithms,
+        ):
+            s.discard(name)
+
     def get_names(self, type_word):
         """Return the set of known names of values of the given type."""
         return {
@@ -257,13 +274,15 @@ class Inputs:
                 if m:
                     self.add_test_case_line(filename, m.group(1), m.group(2))
 
-def gather_inputs(headers, test_suites):
+def gather_inputs(headers, test_suites, filter_function=None):
     """Read the list of inputs to test psa_constant_names with."""
     inputs = Inputs()
     for header in headers:
         inputs.parse_header(header)
     for test_cases in test_suites:
         inputs.parse_test_cases(test_cases)
+    if filter_function:
+        filter_function(inputs)
     inputs.gather_arguments()
     return inputs
 
