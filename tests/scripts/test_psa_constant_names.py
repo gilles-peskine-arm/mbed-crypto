@@ -95,6 +95,8 @@ class Inputs:
         }
         # macro name -> list of argument names
         self.argspecs = {}
+        # macro name -> file that defines it
+        self.origins = {}
         # argument name -> list of values
         self.arguments_for = {
             'mac_length': ['1', '63'],
@@ -196,7 +198,7 @@ class Inputs:
         'PSA_ERROR_INSUFFICIENT_CAPACITY',
         'PSA_ERROR_TAMPERING_DETECTED',
     ])
-    def parse_header_line(self, line):
+    def parse_header_line(self, filename, line):
         """Parse a C header line, looking for "#define PSA_xxx"."""
         m = re.match(self._header_line_re, line)
         if not m:
@@ -209,6 +211,7 @@ class Inputs:
         if dest is None:
             return
         dest.add(name)
+        self.origins[name] = filename
         if m.group(3):
             self.argspecs[name] = self._argument_split(m.group(3))
 
@@ -216,9 +219,9 @@ class Inputs:
         """Parse a C header file, looking for "#define PSA_xxx"."""
         with read_file_lines(filename) as lines:
             for line in lines:
-                self.parse_header_line(line)
+                self.parse_header_line(filename, line)
 
-    def add_test_case_line(self, function, argument):
+    def add_test_case_line(self, filename, function, argument):
         """Parse a test case data line, looking for algorithm metadata tests."""
         if function.endswith('_algorithm'):
             # As above, ECDH and FFDH algorithms are excluded for now.
@@ -238,6 +241,9 @@ class Inputs:
             self.ecc_curves.add(argument)
         elif function == 'dh_key_types':
             self.dh_groups.add(argument)
+        else:
+            return
+        self.origins.setdefault(argument, filename)
 
     # Regex matching a *.data line containing a test function call and
     # its arguments. The actual definition is partly positional, but this
@@ -249,7 +255,7 @@ class Inputs:
             for line in lines:
                 m = re.match(self._test_case_line_re, line)
                 if m:
-                    self.add_test_case_line(m.group(1), m.group(2))
+                    self.add_test_case_line(filename, m.group(1), m.group(2))
 
 def gather_inputs(headers, test_suites):
     """Read the list of inputs to test psa_constant_names with."""
