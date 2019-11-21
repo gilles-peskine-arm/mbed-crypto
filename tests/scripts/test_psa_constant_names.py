@@ -220,24 +220,27 @@ class Inputs:
 
     def add_test_case_line(self, function, argument):
         """Parse a test case data line, looking for algorithm metadata tests."""
+        sets = []
         if function.endswith('_algorithm'):
             # As above, ECDH and FFDH algorithms are excluded for now.
             # Support for them will be added in the future.
             if 'ECDH' in argument or 'FFDH' in argument:
                 return
-            self.algorithms.add(argument)
+            sets.append(self.algorithms)
             if function == 'hash_algorithm':
-                self.hash_algorithms.add(argument)
+                sets.append(self.hash_algorithms)
             elif function in ['mac_algorithm', 'hmac_algorithm']:
-                self.mac_algorithms.add(argument)
+                sets.append(self.mac_algorithms)
             elif function == 'aead_algorithm':
-                self.aead_algorithms.add(argument)
+                sets.append(self.aead_algorithms)
         elif function == 'key_type':
-            self.key_types.add(argument)
+            sets.append(self.key_types)
         elif function == 'ecc_key_types':
-            self.ecc_curves.add(argument)
+            sets.append(self.ecc_curves)
         elif function == 'dh_key_types':
-            self.dh_groups.add(argument)
+            sets.append(self.dh_groups)
+        for s in sets:
+            s.add(argument)
 
     # Regex matching a *.data line containing a test function call and
     # its arguments. The actual definition is partly positional, but this
