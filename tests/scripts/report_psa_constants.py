@@ -28,6 +28,17 @@ import test_psa_constant_names
 HEADERS = ['psa/crypto_values.h']
 TEST_SUITES = test_psa_constant_names.TEST_SUITES
 
+def discard_nonstandard_names(inputs):
+    """Remove names that only appear in test suites but not in headers.
+
+    The reason we collect names from test suites and then remove them
+    is that names of specific types of algorithms can only be inferred
+    from test suites, not from headers.
+    """
+    for name in inputs.origins:
+        if inputs.origins[name] in TEST_SUITES:
+            inputs.discard_name(name)
+
 def prettify_expression(expr):
     """Adjust spacing to make an expression prettier."""
     expr = test_psa_constant_names.normalize(expr)
@@ -73,7 +84,8 @@ def main():
                         help='Program to test')
     options = parser.parse_args()
     headers = [os.path.join(options.include[0], h) for h in HEADERS]
-    inputs = test_psa_constant_names.gather_inputs(headers, TEST_SUITES)
+    inputs = test_psa_constant_names.gather_inputs(headers, TEST_SUITES,
+                                                   discard_nonstandard_names)
     data = process_inputs(options, inputs)
     output_csv(data, sys.stdout)
 
