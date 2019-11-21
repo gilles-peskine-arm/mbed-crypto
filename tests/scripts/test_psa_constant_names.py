@@ -68,6 +68,7 @@ class Inputs:
     """
 
     def __init__(self):
+        self.all_declared = set()
         # Sets of names per type
         self.statuses = set(['PSA_SUCCESS'])
         self.algorithms = set(['0xffffffff'])
@@ -208,6 +209,7 @@ class Inputs:
         dest = self.table_by_prefix.get(m.group(2))
         if dest is None:
             return
+        all_declared.add(name)
         dest.add(name)
         if m.group(3):
             self.argspecs[name] = self._argument_split(m.group(3))
@@ -239,6 +241,10 @@ class Inputs:
             sets.append(self.ecc_curves)
         elif function == 'dh_key_types':
             sets.append(self.dh_groups)
+        if not sets:
+            return
+        if argument not in sets[0]:
+            print(argument)
         for s in sets:
             s.add(argument)
 
