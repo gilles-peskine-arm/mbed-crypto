@@ -100,6 +100,17 @@ class Inputs:
             'tag_length': ['1', '63'],
         }
 
+    def get_names(self, type_word):
+        """Return the set of known names of values of the given type."""
+        return {
+            'status': self.statuses,
+            'algorithm': self.algorithms,
+            'ecc_curve': self.ecc_curves,
+            'dh_group': self.dh_groups,
+            'key_type': self.key_types,
+            'key_usage': self.key_usage_flags,
+        }[type_word]
+
     def gather_arguments(self):
         """Populate the list of values for macro arguments.
 
@@ -348,13 +359,9 @@ def run_tests(options, inputs):
     """
     count = 0
     errors = []
-    for type_word, names in [('status', inputs.statuses),
-                             ('algorithm', inputs.algorithms),
-                             ('ecc_curve', inputs.ecc_curves),
-                             ('dh_group', inputs.dh_groups),
-                             ('key_type', inputs.key_types),
-                             ('key_usage', inputs.key_usage_flags)]:
-        c, e = do_test(options, inputs, type_word, names)
+    for type_word in ['status', 'algorithm', 'ecc_curve', 'dh_group',
+                      'key_type', 'key_usage']:
+        c, e = do_test(options, inputs, type_word)
         count += c
         errors += e
     return count, errors
