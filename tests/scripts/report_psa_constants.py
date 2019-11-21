@@ -28,6 +28,17 @@ import test_psa_constant_names
 HEADERS = ['psa/crypto_values.h']
 TEST_SUITES = test_psa_constant_names.TEST_SUITES
 
+class Inputs(test_psa_constant_names.Inputs):
+    """Accumulate information about macros to test.
+
+    Test cases that use macro names not found in headers are skipped.
+    """
+
+    def accept_test_case_line(self, function, argument):
+        #pylint: disable=unused-argument
+        undeclared = list(self.generate_undeclared_names(argument))
+        return not undeclared
+
 def prettify_expression(expr):
     """Adjust spacing to make an expression prettier."""
     expr = test_psa_constant_names.normalize(expr)
@@ -73,7 +84,7 @@ def main():
                         help='Program to test')
     options = parser.parse_args()
     headers = [os.path.join(options.include[0], h) for h in HEADERS]
-    inputs = test_psa_constant_names.gather_inputs(headers, TEST_SUITES)
+    inputs = test_psa_constant_names.gather_inputs(headers, TEST_SUITES, Inputs)
     data = process_inputs(options, inputs)
     output_csv(data, sys.stdout)
 
