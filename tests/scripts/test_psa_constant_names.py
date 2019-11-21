@@ -186,10 +186,6 @@ class Inputs:
         # Auxiliary macro whose name doesn't fit the usual patterns for
         # auxiliary macros.
         'PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE',
-        # PSA_ALG_ECDH and PSA_ALG_FFDH are excluded for now as the script
-        # currently doesn't support them.
-        'PSA_ALG_ECDH',
-        'PSA_ALG_FFDH',
         # Deprecated aliases.
         'PSA_ERROR_UNKNOWN_ERROR',
         'PSA_ERROR_OCCUPIED_SLOT',
@@ -237,10 +233,6 @@ class Inputs:
         """Parse a test case data line, looking for algorithm metadata tests."""
         sets = []
         if function.endswith('_algorithm'):
-            # As above, ECDH and FFDH algorithms are excluded for now.
-            # Support for them will be added in the future.
-            if 'ECDH' in argument or 'FFDH' in argument:
-                return
             sets.append(self.algorithms)
             if function == 'hash_algorithm':
                 sets.append(self.hash_algorithms)
@@ -248,6 +240,13 @@ class Inputs:
                 sets.append(self.mac_algorithms)
             elif function == 'aead_algorithm':
                 sets.append(self.aead_algorithms)
+            elif function == 'key_derivation_algorithm':
+                sets.append(self.kdf_algorithms)
+            elif function == 'key_agreement_algorithm':
+                # We only want *raw* key agreement algorithms here, so
+                # exclude ones that are already chained with a KDF.
+                if not argument.startswith('PSA_ALG_KEY_AGREEMENT('):
+                    sets.append(self.ka_algorithms)
         elif function == 'key_type':
             sets.append(self.key_types)
         elif function == 'ecc_key_types':
