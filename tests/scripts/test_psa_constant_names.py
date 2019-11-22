@@ -94,6 +94,18 @@ class Inputs:
             'KEY_TYPE': self.key_types,
             'KEY_USAGE': self.key_usage_flags,
         }
+        # Test functions
+        self.table_by_test_function = {
+            'aead_algorithm': self.aead_algorithms,
+            'hash_algorithm': self.hash_algorithms,
+            'mac_algorithm': self.mac_algorithms,
+            'key_derivation_algorithm': self.kdf_algorithms,
+            'key_agreement_algorithm': self.ka_algorithms,
+            'hmac_algorithm': self.mac_algorithms,
+            'key_type': self.key_types,
+            'ecc_key_types': self.ecc_curves,
+            'dh_key_types': self.dh_groups,
+        }
         # macro name -> list of argument names
         self.argspecs = {}
         # argument name -> list of values
@@ -234,27 +246,13 @@ class Inputs:
         sets = []
         if function.endswith('_algorithm'):
             sets.append(self.algorithms)
-            if function == 'hash_algorithm':
-                sets.append(self.hash_algorithms)
-            elif function in ['mac_algorithm', 'hmac_algorithm']:
-                sets.append(self.mac_algorithms)
-            elif function == 'aead_algorithm':
-                sets.append(self.aead_algorithms)
-            elif function == 'key_derivation_algorithm':
-                sets.append(self.kdf_algorithms)
-            elif function == 'key_agreement_algorithm':
-                # We only want *raw* key agreement algorithms here, so
-                # exclude ones that are already chained with a KDF.
-                if not argument.startswith('PSA_ALG_KEY_AGREEMENT('):
-                    sets.append(self.ka_algorithms)
-        elif function == 'key_type':
-            sets.append(self.key_types)
-        elif function == 'ecc_key_types':
-            sets.append(self.ecc_curves)
-        elif function == 'dh_key_types':
-            sets.append(self.dh_groups)
-        else:
-            return
+            if function == 'key_agreement_algorithm' and \
+                argument.startswith('PSA_ALG_KEY_AGREEMENT('):
+                    # We only want *raw* key agreement algorithms here, so
+                    # exclude ones that are already chained with a KDF.
+                    function = 'other_algorithm'
+        if function in self.table_by_test_function:
+            sets.append(self.table_by_test_function[function])
         if self.accept_test_case_line(function, argument):
             for s in sets:
                 s.add(argument)
