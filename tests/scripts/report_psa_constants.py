@@ -76,14 +76,23 @@ def output_csv(data, out):
 
 def main():
     parser = argparse.ArgumentParser(description=globals()['__doc__'])
+    parser.add_argument('--header', '-H',
+                        action='append', default=HEADERS,
+                        help='Header to parse (relative to an include directory)')
     parser.add_argument('--include', '-I',
                         action='append', default=['include'],
-                        help='Directory for header files')
+                        help='Directory for header files (default: include)')
     parser.add_argument('--program',
                         default='programs/psa/psa_constant_names',
                         help='Program to test')
+    parser.add_argument('--reset-headers',
+                        action='store_const', dest='header', const=[],
+                        help='Reset the list of headers (undoes all --header).')
+    parser.add_argument('--reset-includes',
+                        action='store_const', dest='include', const=[],
+                        help='Reset the list of include directories (undoes all --include).')
     options = parser.parse_args()
-    headers = [os.path.join(options.include[0], h) for h in HEADERS]
+    headers = [os.path.join(options.include[0], h) for h in options.header]
     inputs = test_psa_constant_names.gather_inputs(headers, TEST_SUITES, Inputs)
     data = process_inputs(options, inputs)
     output_csv(data, sys.stdout)
