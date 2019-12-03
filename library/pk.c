@@ -586,40 +586,6 @@ mbedtls_pk_type_t mbedtls_pk_get_type( const mbedtls_pk_context *ctx )
 
 #if defined(MBEDTLS_USE_PSA_CRYPTO)
 
-static psa_ecc_curve_t psa_key_type_of_ec( const mbedtls_ecp_keypair *ec )
-{
-    switch( ec->grp.id )
-    {
-        case MBEDTLS_ECP_DP_SECP192R1:
-            return( PSA_ECC_CURVE_SECP192R1 );
-        case MBEDTLS_ECP_DP_SECP224R1:
-            return( PSA_ECC_CURVE_SECP224R1 );
-        case MBEDTLS_ECP_DP_SECP256R1:
-            return( PSA_ECC_CURVE_SECP256R1 );
-        case MBEDTLS_ECP_DP_SECP384R1:
-            return( PSA_ECC_CURVE_SECP384R1 );
-        case MBEDTLS_ECP_DP_SECP521R1:
-            return( PSA_ECC_CURVE_SECP521R1 );
-        case MBEDTLS_ECP_DP_BP256R1:
-            return( PSA_ECC_CURVE_BRAINPOOL_P256R1 );
-        case MBEDTLS_ECP_DP_BP384R1:
-            return( PSA_ECC_CURVE_BRAINPOOL_P384R1 );
-        case MBEDTLS_ECP_DP_BP512R1:
-            return( PSA_ECC_CURVE_BRAINPOOL_P512R1 );
-        case MBEDTLS_ECP_DP_CURVE25519:
-            return( PSA_ECC_CURVE_CURVE25519 );
-        case MBEDTLS_ECP_DP_SECP192K1:
-            return( PSA_ECC_CURVE_SECP192K1 );
-        case MBEDTLS_ECP_DP_SECP224K1:
-            return( PSA_ECC_CURVE_SECP224K1 );
-        case MBEDTLS_ECP_DP_SECP256K1:
-            return( PSA_ECC_CURVE_SECP256K1 );
-        case MBEDTLS_ECP_DP_CURVE448:
-            return( PSA_ECC_CURVE_CURVE448 );
-        default:
-            return( 0 );
-    }
-}
 /*
  * Load the key to a PSA key slot,
  * then turn the PK context into a wrapper for that key slot.
@@ -638,6 +604,7 @@ int mbedtls_pk_wrap_as_opaque( mbedtls_pk_context *pk,
     size_t d_len;
     psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
     psa_key_type_t key_type;
+    psa_ecc_curve_t curve;
     int ret;
 
     /* export the private key material in the format PSA wants */
@@ -650,7 +617,8 @@ int mbedtls_pk_wrap_as_opaque( mbedtls_pk_context *pk,
         return( ret );
 
     /* prepare the key attributes */
-    key_type = PSA_KEY_TYPE_ECC_KEY_PAIR( psa_key_type_of_ec( ec ) );
+    curve = mbedtls_psa_translate_ecc_group( ec->grp.id );
+    key_type = PSA_KEY_TYPE_ECC_KEY_PAIR( curve );
     psa_set_key_type( &attributes, key_type );
     psa_set_key_usage_flags( &attributes, PSA_KEY_USAGE_SIGN );
     psa_set_key_algorithm( &attributes, PSA_ALG_ECDSA(hash_alg) );
