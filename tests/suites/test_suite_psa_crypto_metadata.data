@@ -388,6 +388,9 @@ ecc_key_family:PSA_ECC_CURVE_SECT_R2
 ECC key family: Brainpool P R1
 ecc_key_family:PSA_ECC_CURVE_BRAINPOOL_P_R1
 
+ECC key family: FRP V1
+ecc_key_family:PSA_ECC_CURVE_FRP
+
 ECC key family: X/Ed Montgomery curves
 ecc_key_family:PSA_ECC_CURVE_XED
 
