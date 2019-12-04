@@ -411,6 +411,10 @@
  * ARIA block cipher. */
 #define PSA_KEY_TYPE_ARIA                           ((psa_key_type_t)0x2405)
 
+/** Key for a cipher, AEAD or MAC algorithm based on the
+ * SM4 block cipher. */
+#define PSA_KEY_TYPE_SM4                            ((psa_key_type_t)0x2406)
+
 /** Key for the RC4 stream cipher.
  *
  * Note that RC4 is weak and deprecated and should only be used in
@@ -760,6 +764,8 @@
 #define PSA_ALG_RIPEMD160                       ((psa_algorithm_t)0x01000004)
 /** SHA1 */
 #define PSA_ALG_SHA_1                           ((psa_algorithm_t)0x01000005)
+/** SM3 */
+#define PSA_ALG_SM3                             ((psa_algorithm_t)0x01000006)
 /** SHA2-224 */
 #define PSA_ALG_SHA_224                         ((psa_algorithm_t)0x01000008)
 /** SHA2-256 */
@@ -1055,6 +1061,20 @@
  */
 #define PSA_ALG_GCM                             ((psa_algorithm_t)0x06401002)
 
+/** The EAX authenticated encryption algorithm.
+ *
+ * The underlying block cipher is determined by the key type.
+ */
+#define PSA_ALG_EAX                             ((psa_algorithm_t)0x06401003)
+
+/** The EAXprime authenticated encryption algorithm defined in ANSI C12.22.
+ *
+ * The underlying block cipher is determined by the key type.
+ *
+ * Note that EAXprime is unsafe with messages that are shorter than the key.
+ */
+#define PSA_ALG_EAX_PRIME                       ((psa_algorithm_t)0x06401004)
+
 /** The Chacha20-Poly1305 AEAD algorithm.
  *
  * The ChaCha20_Poly1305 construction is defined in RFC 7539.
@@ -1108,6 +1128,8 @@
     (                                                                    \
         PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, PSA_ALG_CCM) \
         PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, PSA_ALG_GCM) \
+        PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, PSA_ALG_EAX) \
+        PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, PSA_ALG_EAX_PRIME) \
         PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, PSA_ALG_CHACHA20_POLY1305) \
         0)
 #define PSA_ALG_AEAD_WITH_DEFAULT_TAG_LENGTH_CASE(aead_alg, ref)         \
