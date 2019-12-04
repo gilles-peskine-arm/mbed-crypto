@@ -615,9 +615,8 @@ int mbedtls_pk_wrap_as_opaque( mbedtls_pk_context *pk,
     if( ( ret = mbedtls_mpi_write_binary( &ec->d, d, d_len ) ) != 0 )
         return( ret );
 
-    curve_id = mbedtls_ecp_curve_info_from_grp_id( ec->grp.id )->tls_id;
-    key_type = PSA_KEY_TYPE_ECC_KEY_PAIR(
-                                 mbedtls_psa_parse_tls_ecc_group ( curve_id ) );
+    curve_id = mbedtls_psa_translate_ecc_group( ec->grp.id );
+    key_type = PSA_KEY_TYPE_ECC_KEY_PAIR( curve_id );
 
     /* prepare the key attributes */
     psa_set_key_type( &attributes, key_type );
