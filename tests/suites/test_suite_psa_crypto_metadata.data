@@ -18,6 +18,10 @@ Hash: SHA-1
 depends_on:MBEDTLS_SHA1_C
 hash_algorithm:PSA_ALG_SHA_1:20
 
+Hash: SM3
+depends_on:MBEDTLS_SM3_C
+hash_algorithm:PSA_ALG_SM3:32
+
 Hash: SHA-2 SHA-224
 depends_on:MBEDTLS_SHA256_C
 hash_algorithm:PSA_ALG_SHA_224:28
@@ -198,6 +202,14 @@ AEAD: GCM
 depends_on:MBEDTLS_GCM_C
 aead_algorithm:PSA_ALG_GCM:ALG_IS_AEAD_ON_BLOCK_CIPHER:16
 
+AEAD: EAX
+depends_on:MBEDTLS_EAX_C
+aead_algorithm:PSA_ALG_EAX:ALG_IS_AEAD_ON_BLOCK_CIPHER:16
+
+AEAD: EAXprime
+depends_on:MBEDTLS_EAX_C
+aead_algorithm:PSA_ALG_EAX_PRIME:ALG_IS_AEAD_ON_BLOCK_CIPHER:16
+
 AEAD: ChaCha20_Poly1305
 depends_on:MBEDTLS_CHACHAPOLY_C
 aead_algorithm:PSA_ALG_CHACHA20_POLY1305:0:16
@@ -342,6 +354,10 @@ block_cipher_key_type:PSA_KEY_TYPE_CAMELLIA:16
 Block cipher key type: ARIA
 depends_on:MBEDTLS_ARIA_C
 block_cipher_key_type:PSA_KEY_TYPE_ARIA:16
+
+Block cipher key type: SM4
+depends_on:MBEDTLS_SM4_C
+block_cipher_key_type:PSA_KEY_TYPE_SM4:16
 
 Stream cipher key type: ARC4
 depends_on:MBEDTLS_ARC4_C
