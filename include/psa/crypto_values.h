@@ -974,7 +974,7 @@
 
 /** The ARC4 stream cipher algorithm.
  */
-#define PSA_ALG_ARC4                            ((psa_algorithm_t)0x04800001)
+#define PSA_ALG_ARC4                            ((psa_algorithm_t)0x04800002)
 
 /** The ChaCha20 stream cipher.
  *
@@ -986,7 +986,7 @@
  * The initial block counter is always 0.
  *
  */
-#define PSA_ALG_CHACHA20                        ((psa_algorithm_t)0x04800005)
+#define PSA_ALG_CHACHA20                        ((psa_algorithm_t)0x04800004)
 
 /** The CTR stream cipher mode.
  *
