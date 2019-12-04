@@ -259,7 +259,9 @@ typedef struct {
     uint8_t magic[PSA_KEY_STORAGE_MAGIC_HEADER_LENGTH];
     uint8_t version[4];
     uint8_t lifetime[sizeof( psa_key_lifetime_t )];
-    uint8_t type[sizeof( psa_key_type_t )];
+    uint8_t type[4]; /* Size=4 for a 2-byte type to keep the structure more
+                      * regular and aligned and to make potential future
+                      * extensibility easier. */
     uint8_t policy[sizeof( psa_key_policy_t )];
     uint8_t data_len[4];
     uint8_t key_data[];
