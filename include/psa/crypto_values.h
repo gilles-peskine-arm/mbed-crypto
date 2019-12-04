@@ -532,6 +532,18 @@
  */
 #define PSA_ECC_CURVE_BRAINPOOL_P_R1    ((psa_ecc_curve_t) 0x30)
 
+/** Curve FRP256V1 used primarily in France and elsewhere in Europe.
+ *
+ * This family comprises one 256-bit curve.
+ *
+ * Reference: Agence nationale de la sécurité des systèmes d'information.
+ * _Publication d'un paramétrage de courbe elliptique visant des applications
+ * de passeport électronique et de l'administration électronique française._
+ * 21 November 2011.
+ * https://www.ssi.gouv.fr/agence/publication/publication-dun-parametrage-de-courbe-elliptique-visant-des-applications-de-passeport-electronique-et-de-ladministration-electronique-francaise/
+ */
+#define PSA_ECC_CURVE_FRP               ((psa_ecc_curve_t) 0x33)
+
 /** Curve25519 and Curve448.
  *
  * This family comprises the following Montgomery curves:
