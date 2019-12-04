@@ -394,9 +394,22 @@
  */
 #define PSA_KEY_TYPE_DES                            ((psa_key_type_t)0x2031)
 
+/** Key for a cipher or MAC algorithm based on Blowfish.
+ *
+ * The size of the key can be 4 to 56 bytes.
+ *
+ * Note that Blowfish is weak and deprecated and should only be used in
+ * legacy protocols.
+ */
+#define PSA_KEY_TYPE_BLOWFISH                       ((psa_key_type_t)0x2032)
+
 /** Key for a cipher, AEAD or MAC algorithm based on the
  * Camellia block cipher. */
 #define PSA_KEY_TYPE_CAMELLIA                       ((psa_key_type_t)0x2043)
+
+/** Key for a cipher, AEAD or MAC algorithm based on the
+ * ARIA block cipher. */
+#define PSA_KEY_TYPE_ARIA                           ((psa_key_type_t)0x2045)
 
 /** Key for the RC4 stream cipher.
  *
@@ -568,13 +581,21 @@
                        ((type) & PSA_KEY_TYPE_DH_GROUP_MASK) :  \
                        0))
 
-/** Diffie-Hellman groups defined in RFC 7919 Appendix A.
+/** Diffie-Hellman FFDHE groups defined in RFC 7919 Appendix A.
  *
  * This family includes groups with the following key sizes (in bits):
  * 2048, 3072, 4096, 6144, 8192. A given implementation may support
  * all of these sizes or only a subet.
  */
 #define PSA_DH_GROUP_RFC7919            ((psa_dh_group_t) 0x03)
+
+/** Diffie-Hellman MODP groups defined in RFC 3526.
+ *
+ * This family includes groups with the following key sizes (in bits):
+ * 2048, 3072, 4096. A given implementation may support
+ * all of these sizes or only a subet.
+ */
+#define PSA_DH_GROUP_RFC3526            ((psa_dh_group_t) 0x05)
 
 #define PSA_GET_KEY_TYPE_BLOCK_SIZE_EXPONENT(type)      \
     (((type) >> 4) & 7)
