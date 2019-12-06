@@ -430,6 +430,38 @@
  */
 #define PSA_KEY_TYPE_CHACHA20                       ((psa_key_type_t)0x2004)
 
+/** Key for the Salsa20/12 stream cipher.
+ */
+#define PSA_KEY_TYPE_SALSA20_12                     ((psa_key_type_t)0x2007)
+
+/** Key for the HC-128 or HC-256 stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_HC                             ((psa_key_type_t)0x2008)
+
+/** Key for the Rabbit stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_RABBIT                         ((psa_key_type_t)0x200b)
+
+/** Key for the SOSEMANUK stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_SOSEMANUK                      ((psa_key_type_t)0x200d)
+
+/** Key for the Grain v1 stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_GRAIN                          ((psa_key_type_t)0x200e)
+
+/** Key for the MICKEY 2.0 stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_MICKEY_2                       ((psa_key_type_t)0x2010)
+
+/** Key for the Trivium stream cipher algorithm.
+ */
+#define PSA_KEY_TYPE_TRIVIUM                        ((psa_key_type_t)0x2013)
+
+/** Key for the ZUC stream cipher.
+ */
+#define PSA_KEY_TYPE_ZUC                            ((psa_key_type_t)0x2015)
+
 /** RSA public key. */
 #define PSA_KEY_TYPE_RSA_PUBLIC_KEY                 ((psa_key_type_t)0x4001)
 /** RSA key pair (private and public key). */
@@ -987,6 +1019,38 @@
  *
  */
 #define PSA_ALG_CHACHA20                        ((psa_algorithm_t)0x04800004)
+
+/** The Salsa20/12 stream cipher algorithm.
+ */
+#define PSA_ALG_SALSA20_12                      ((psa_algorithm_t)0x04800007)
+
+/** The HC-128 and HC-256 stream cipher algorithms.
+ */
+#define PSA_ALG_HC                              ((psa_algorithm_t)0x04800008)
+
+/** The Rabbit stream cipher algorithm.
+ */
+#define PSA_ALG_RABBIT                          ((psa_algorithm_t)0x0480000b)
+
+/** The SOSEMANUK stream cipher algorithm.
+ */
+#define PSA_ALG_SOSEMANUK                       ((psa_algorithm_t)0x0480000d)
+
+/** The Grain v1 stream cipher algorithm.
+ */
+#define PSA_ALG_GRAIN                           ((psa_algorithm_t)0x0480000e)
+
+/** The MICKEY 2.0 stream cipher algorithm.
+ */
+#define PSA_ALG_MICKEY_2                        ((psa_algorithm_t)0x04800010)
+
+/** The Trivium stream cipher algorithm.
+ */
+#define PSA_ALG_TRIVIUM                         ((psa_algorithm_t)0x04800013)
+
+/** The ZUC stream cipher algorithm.
+ */
+#define PSA_ALG_ZUC                             ((psa_algorithm_t)0x04800015)
 
 /** The CTR stream cipher mode.
  *
