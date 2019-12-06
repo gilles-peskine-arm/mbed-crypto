@@ -430,6 +430,10 @@
  */
 #define PSA_KEY_TYPE_CHACHA20                       ((psa_key_type_t)0x2004)
 
+/** Key for the ZUC stream cipher.
+ */
+#define PSA_KEY_TYPE_ZUC                            ((psa_key_type_t)0x2007)
+
 /** RSA public key. */
 #define PSA_KEY_TYPE_RSA_PUBLIC_KEY                 ((psa_key_type_t)0x4001)
 /** RSA key pair (private and public key). */
