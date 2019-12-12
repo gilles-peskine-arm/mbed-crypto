@@ -353,9 +353,13 @@ static inline int mbedtls_psa_err_translate_pk( psa_status_t status )
 static inline psa_ecc_curve_t mbedtls_psa_parse_tls_ecc_group(
     uint16_t tls_ecc_grp_reg_id )
 {
-    /* The PSA identifiers are currently aligned with those from
-     * the TLS Supported Groups registry, so no conversion is necessary. */
-    return( (psa_ecc_curve_t) tls_ecc_grp_reg_id );
+    size_t bits;
+    const mbedtls_ecp_curve_info *curve_info =
+        mbedtls_ecp_curve_info_from_tls_id( tls_ecc_grp_reg_id );
+    if( curve_info == NULL )
+        return( 0 );
+    else
+        return( mbedtls_ecc_group_to_psa( curve_info->grp_id, &bits ) );
 }
 
 /* This function takes a buffer holding an EC public key
