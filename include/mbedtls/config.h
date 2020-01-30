@@ -1461,14 +1461,17 @@
  *
  * Enable the HAVEGE random generator.
  *
- * Warning: the HAVEGE random generator is not suitable for virtualized
+ * \warning The HAVEGE random generator is not suitable for virtualized
  *          environments
  *
- * Warning: the HAVEGE random generator is dependent on timing and specific
+ * \warning The HAVEGE random generator is dependent on timing and specific
  *          processor traits. It is therefore not advised to use HAVEGE as
  *          your applications primary random generator or primary entropy pool
- *          input. As a secondary input to your entropy pool, it IS able add
+ *          input. As a secondary input to your entropy pool, it IS able to add
  *          the (limited) extra entropy it provides.
+ *
+ * \deprecated This feature is deprecated and will be removed
+ *             in the next major revision of the library.
  *
  * Module:  library/havege.c
  * Caller:

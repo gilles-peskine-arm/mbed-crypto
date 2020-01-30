@@ -34,6 +34,12 @@
 
 #if defined(MBEDTLS_HAVEGE_C)
 
+#if defined(MBEDTLS_DEPRECATED_REMOVED)
+#error "MBEDTLS_HAVEGE_C is deprecated and cannot be used if MBEDTLS_DEPRECATED_REMOVED is set."
+#elif defined(MBEDTLS_DEPRECATED_WARNING)
+#warning "MBEDTLS_HAVEGE_C is deprecated and will likely be removed in a future version of Mbed TLS."
+#endif
+
 #include "mbedtls/havege.h"
 #include "mbedtls/timing.h"
 #include "mbedtls/platform_util.h"
