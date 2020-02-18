@@ -1,10 +1,9 @@
 
 # To compile on SunOS: add "-lsocket -lnsl" to LDFLAGS
-# To compile with PKCS11: add "-lpkcs11-helper" to LDFLAGS
 
 CFLAGS	?= -O2
-WARNING_CFLAGS ?= -Wall -W -Wdeclaration-after-statement
-WARNING_CXXFLAGS ?= -Wall -W
+WARNING_CFLAGS ?= -Wall -Wextra
+WARNING_CXXFLAGS ?= -Wall -Wextra
 LDFLAGS ?=
 
 LOCAL_CFLAGS = $(WARNING_CFLAGS) -I../include -D_FILE_OFFSET_BITS=64
@@ -13,6 +12,9 @@ LOCAL_LDFLAGS = -L../library 			\
 		-lmbedtls$(SHARED_SUFFIX)	\
 		-lmbedx509$(SHARED_SUFFIX)	\
 		-lmbedcrypto$(SHARED_SUFFIX)
+
+include ../3rdparty/Makefile.inc
+LOCAL_CFLAGS+=$(THIRDPARTY_INCLUDES)
 
 ifndef SHARED
 DEP=../library/libmbedcrypto.a ../library/libmbedx509.a ../library/libmbedtls.a
@@ -47,35 +49,57 @@ ifdef ZLIB
 LOCAL_LDFLAGS += -lz
 endif
 
-APPS =	aes/aescrypt2$(EXEXT)		aes/crypt_and_hash$(EXEXT)	\
-	hash/hello$(EXEXT)		hash/generic_sum$(EXEXT)	\
-	pkey/dh_genprime$(EXEXT)					\
-	pkey/ecdh_curve25519$(EXEXT)					\
-	pkey/ecdsa$(EXEXT)		pkey/gen_key$(EXEXT)		\
-	pkey/key_app$(EXEXT)		pkey/key_app_writer$(EXEXT)	\
-	pkey/mpi_demo$(EXEXT)		pkey/pk_decrypt$(EXEXT)		\
-	pkey/pk_encrypt$(EXEXT)		pkey/pk_sign$(EXEXT)		\
-	pkey/pk_verify$(EXEXT)		pkey/rsa_genkey$(EXEXT)		\
-	pkey/rsa_decrypt$(EXEXT)	pkey/rsa_encrypt$(EXEXT)	\
-	pkey/rsa_sign$(EXEXT)		pkey/rsa_verify$(EXEXT)		\
-	pkey/rsa_sign_pss$(EXEXT)	pkey/rsa_verify_pss$(EXEXT)	\
-	psa/crypto_examples$(EXEXT)					\
-	psa/key_ladder_demo$(EXEXT)	psa/psa_constant_names$(EXEXT)	\
-	ssl/dtls_client$(EXEXT)		ssl/dtls_server$(EXEXT)		\
-	ssl/ssl_client1$(EXEXT)		ssl/ssl_client2$(EXEXT)		\
-	ssl/ssl_server$(EXEXT)		ssl/ssl_server2$(EXEXT)		\
-	ssl/ssl_fork_server$(EXEXT)	ssl/mini_client$(EXEXT)		\
-	ssl/ssl_mail_client$(EXEXT)	random/gen_entropy$(EXEXT)	\
-	random/gen_random_havege$(EXEXT)				\
-	random/gen_random_ctr_drbg$(EXEXT)				\
-	test/ssl_cert_test$(EXEXT)	test/benchmark$(EXEXT)		\
-	test/selftest$(EXEXT)		test/udp_proxy$(EXEXT)		\
-	test/zeroize$(EXEXT)						\
-	test/query_compile_time_config$(EXEXT)				\
-	util/pem2der$(EXEXT)		util/strerror$(EXEXT)		\
-	x509/cert_app$(EXEXT)		x509/crl_app$(EXEXT)		\
-	x509/cert_req$(EXEXT)		x509/cert_write$(EXEXT)		\
-	x509/req_app$(EXEXT)
+APPS = \
+	aes/aescrypt2$(EXEXT) \
+	aes/crypt_and_hash$(EXEXT) \
+	hash/hello$(EXEXT) \
+	hash/generic_sum$(EXEXT) \
+	pkey/dh_genprime$(EXEXT) \
+	pkey/ecdh_curve25519$(EXEXT) \
+	pkey/ecdsa$(EXEXT) \
+	pkey/gen_key$(EXEXT) \
+	pkey/key_app$(EXEXT) \
+	pkey/key_app_writer$(EXEXT) \
+	pkey/mpi_demo$(EXEXT) \
+	pkey/pk_decrypt$(EXEXT) \
+	pkey/pk_encrypt$(EXEXT) \
+	pkey/pk_sign$(EXEXT) \
+	pkey/pk_verify$(EXEXT) \
+	pkey/rsa_genkey$(EXEXT) \
+	pkey/rsa_decrypt$(EXEXT) \
+	pkey/rsa_encrypt$(EXEXT) \
+	pkey/rsa_sign$(EXEXT) \
+	pkey/rsa_verify$(EXEXT) \
+	pkey/rsa_sign_pss$(EXEXT) \
+	pkey/rsa_verify_pss$(EXEXT) \
+	psa/crypto_examples$(EXEXT) \
+	psa/key_ladder_demo$(EXEXT) \
+	psa/psa_constant_names$(EXEXT) \
+	ssl/dtls_client$(EXEXT) \
+	ssl/dtls_server$(EXEXT) \
+	ssl/ssl_client1$(EXEXT) \
+	ssl/ssl_client2$(EXEXT) \
+	ssl/ssl_server$(EXEXT) \
+	ssl/ssl_server2$(EXEXT) \
+	ssl/ssl_fork_server$(EXEXT) \
+	ssl/mini_client$(EXEXT) \
+	ssl/ssl_mail_client$(EXEXT) \
+	random/gen_entropy$(EXEXT) \
+	random/gen_random_havege$(EXEXT) \
+	random/gen_random_ctr_drbg$(EXEXT) \
+	test/benchmark$(EXEXT) \
+	test/selftest$(EXEXT) \
+	test/udp_proxy$(EXEXT) \
+	test/zeroize$(EXEXT) \
+	test/query_compile_time_config$(EXEXT) \
+	util/pem2der$(EXEXT) \
+	util/strerror$(EXEXT) \
+	x509/cert_app$(EXEXT) \
+	x509/crl_app$(EXEXT) \
+	x509/cert_req$(EXEXT) \
+	x509/cert_write$(EXEXT) \
+	x509/req_app$(EXEXT) \
+# End of APPS
 
 ifdef PTHREAD
 APPS +=	ssl/ssl_pthread_server$(EXEXT)
@@ -226,17 +250,17 @@ ssl/ssl_client1$(EXEXT): ssl/ssl_client1.c $(DEP)
 	echo "  CC    ssl/ssl_client1.c"
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_client1.c  $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
-ssl/ssl_client2$(EXEXT): ssl/ssl_client2.c ssl/query_config.c $(DEP)
+ssl/ssl_client2$(EXEXT): ssl/ssl_client2.c test/query_config.c $(DEP)
 	echo "  CC    ssl/ssl_client2.c"
-	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_client2.c ssl/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
+	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_client2.c test/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
 ssl/ssl_server$(EXEXT): ssl/ssl_server.c $(DEP)
 	echo "  CC    ssl/ssl_server.c"
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_server.c   $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
-ssl/ssl_server2$(EXEXT): ssl/ssl_server2.c ssl/query_config.c $(DEP)
+ssl/ssl_server2$(EXEXT): ssl/ssl_server2.c test/query_config.c $(DEP)
 	echo "  CC    ssl/ssl_server2.c"
-	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_server2.c ssl/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
+	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/ssl_server2.c test/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
 ssl/ssl_fork_server$(EXEXT): ssl/ssl_fork_server.c $(DEP)
 	echo "  CC    ssl/ssl_fork_server.c"
@@ -253,10 +277,6 @@ ssl/ssl_mail_client$(EXEXT): ssl/ssl_mail_client.c $(DEP)
 ssl/mini_client$(EXEXT): ssl/mini_client.c $(DEP)
 	echo "  CC    ssl/mini_client.c"
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) ssl/mini_client.c   $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
-
-test/ssl_cert_test$(EXEXT): test/ssl_cert_test.c $(DEP)
-	echo "  CC    test/ssl_cert_test.c"
-	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) test/ssl_cert_test.c   $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
 test/benchmark$(EXEXT): test/benchmark.c $(DEP)
 	echo "  CC    test/benchmark.c"
@@ -278,9 +298,9 @@ test/zeroize$(EXEXT): test/zeroize.c $(DEP)
 	echo "  CC    test/zeroize.c"
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) test/zeroize.c    $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
-test/query_compile_time_config$(EXEXT): test/query_compile_time_config.c ssl/query_config.c $(DEP)
+test/query_compile_time_config$(EXEXT): test/query_compile_time_config.c test/query_config.c $(DEP)
 	echo "  CC    test/query_compile_time_config.c"
-	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) test/query_compile_time_config.c ssl/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
+	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) test/query_compile_time_config.c test/query_config.c $(LOCAL_LDFLAGS) $(LDFLAGS) -o $@
 
 util/pem2der$(EXEXT): util/pem2der.c $(DEP)
 	echo "  CC    util/pem2der.c"
@@ -317,9 +337,10 @@ psa/crypto_examples$(EXEXT): psa/crypto_examples.c $(DEP)
 clean:
 ifndef WINDOWS
 	rm -f $(APPS) $(EXTRA_GENERATED)
+	-rm -f test/cpp_dummy_build$(EXEXT)
 else
-	if exist *.o del /S /Q /F *.o
-	if exist *.exe del /S /Q /F *.exe
+	if exist *.o del /Q /F *.o
+	if exist *.exe del /Q /F *.exe
 	if exist $(EXTRA_GENERATED) del /S /Q /F $(EXTRA_GENERATED)
 endif
 

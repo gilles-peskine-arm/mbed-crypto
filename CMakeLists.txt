@@ -5,7 +5,9 @@ else()
     project("mbed TLS" C)
 endif()
 
-option(USE_PKCS11_HELPER_LIBRARY "Build mbed TLS with the pkcs11-helper library." OFF)
+# Set the project root directory.
+set(MBEDTLS_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 option(ENABLE_ZLIB_SUPPORT "Build mbed TLS with zlib library." OFF)
 
 option(ENABLE_PROGRAMS "Build mbed TLS programs." ON)
@@ -46,19 +48,19 @@ set(CTR_DRBG_128_BIT_KEY_WARNING "${WARNING_BORDER}"
                          "${CTR_DRBG_128_BIT_KEY_WARN_L3}"
                          "${WARNING_BORDER}")
 
-find_package(PythonInterp)
-find_package(Perl)
-if(PERL_FOUND)
+# Python 3 is only needed here to check for configuration warnings.
+find_package(PythonInterp 3)
+if(PYTHONINTERP_FOUND)
 
     # If 128-bit keys are configured for CTR_DRBG, display an appropriate warning
-    execute_process(COMMAND ${PERL_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/config.pl -f ${CMAKE_CURRENT_SOURCE_DIR}/include/mbedtls/config.h get MBEDTLS_CTR_DRBG_USE_128_BIT_KEY
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/config.py -f ${CMAKE_CURRENT_SOURCE_DIR}/include/mbedtls/config.h get MBEDTLS_CTR_DRBG_USE_128_BIT_KEY
                         RESULT_VARIABLE result)
     if(${result} EQUAL 0)
         message(WARNING ${CTR_DRBG_128_BIT_KEY_WARNING})
     endif()
 
     # If NULL Entropy is configured, display an appropriate warning
-    execute_process(COMMAND ${PERL_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/config.pl -f ${CMAKE_CURRENT_SOURCE_DIR}/include/mbedtls/config.h get MBEDTLS_TEST_NULL_ENTROPY
+    execute_process(COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/config.py -f ${CMAKE_CURRENT_SOURCE_DIR}/include/mbedtls/config.h get MBEDTLS_TEST_NULL_ENTROPY
                         RESULT_VARIABLE result)
     if(${result} EQUAL 0)
         message(WARNING ${NULL_ENTROPY_WARNING})
@@ -87,8 +89,14 @@ set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}
 # to the corresponding path in the source directory.
 function(link_to_source base_name)
     # Get OS dependent path to use in `execute_process`
-    file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${base_name}" link)
-    file(TO_NATIVE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/${base_name}" target)
+    if (CMAKE_HOST_WIN32)
+        #mklink is an internal command of cmd.exe it can only work with \
+        string(REPLACE "/" "\\" link "${CMAKE_CURRENT_BINARY_DIR}/${base_name}")
+        string(REPLACE "/" "\\" target "${CMAKE_CURRENT_SOURCE_DIR}/${base_name}")
+    else()
+        set(link "${CMAKE_CURRENT_BINARY_DIR}/${base_name}")
+        set(target "${CMAKE_CURRENT_SOURCE_DIR}/${base_name}")
+    endif()
 
     if (NOT EXISTS ${link})
         if (CMAKE_HOST_UNIX)
@@ -118,7 +126,10 @@ if(CMAKE_COMPILER_IS_GNU)
     # note: starting with CMake 2.8 we could use CMAKE_C_COMPILER_VERSION
     execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpversion
                     OUTPUT_VARIABLE GCC_VERSION)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -W -Wdeclaration-after-statement -Wwrite-strings")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings")
+    if (GCC_VERSION VERSION_GREATER 4.3 OR GCC_VERSION VERSION_EQUAL 4.3)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wvla")
+    endif()
     if (GCC_VERSION VERSION_GREATER 4.5 OR GCC_VERSION VERSION_EQUAL 4.5)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wlogical-op")
     endif()
@@ -128,19 +139,19 @@ if(CMAKE_COMPILER_IS_GNU)
     set(CMAKE_C_FLAGS_RELEASE     "-O2")
     set(CMAKE_C_FLAGS_DEBUG       "-O0 -g3")
     set(CMAKE_C_FLAGS_COVERAGE    "-O0 -g3 --coverage")
-    set(CMAKE_C_FLAGS_ASAN        "-Werror -fsanitize=address -fno-common -O3")
-    set(CMAKE_C_FLAGS_ASANDBG     "-Werror -fsanitize=address -fno-common -O1 -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls ")
+    set(CMAKE_C_FLAGS_ASAN        "-Werror -fsanitize=address -fno-common -fsanitize=undefined -fno-sanitize-recover=all -O3")
+    set(CMAKE_C_FLAGS_ASANDBG     "-Werror -fsanitize=address -fno-common -fsanitize=undefined -fno-sanitize-recover=all -O1 -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls")
     set(CMAKE_C_FLAGS_CHECK       "-Werror -Os")
     set(CMAKE_C_FLAGS_CHECKFULL   "${CMAKE_C_FLAGS_CHECK} -Wcast-qual")
 endif(CMAKE_COMPILER_IS_GNU)
 
 if(CMAKE_COMPILER_IS_CLANG)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -W -Wdeclaration-after-statement -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wwrite-strings -Wpointer-arith -Wimplicit-fallthrough -Wshadow -Wvla")
     set(CMAKE_C_FLAGS_RELEASE     "-O2")
     set(CMAKE_C_FLAGS_DEBUG       "-O0 -g3")
     set(CMAKE_C_FLAGS_COVERAGE    "-O0 -g3 --coverage")
     set(CMAKE_C_FLAGS_ASAN        "-Werror -fsanitize=address -fno-common -fsanitize=undefined -fno-sanitize-recover=all -O3")
-    set(CMAKE_C_FLAGS_ASANDBG     "-Werror -fsanitize=address -fno-common -fsanitize=undefined -fno-sanitize-recover=all -O1 -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls ")
+    set(CMAKE_C_FLAGS_ASANDBG     "-Werror -fsanitize=address -fno-common -fsanitize=undefined -fno-sanitize-recover=all -O1 -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls")
     set(CMAKE_C_FLAGS_MEMSAN      "-Werror -fsanitize=memory -O3")
     set(CMAKE_C_FLAGS_MEMSANDBG   "-Werror -fsanitize=memory -O1 -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fsanitize-memory-track-origins=2")
     set(CMAKE_C_FLAGS_CHECK       "-Werror -Os")
@@ -178,8 +189,14 @@ if(ENABLE_ZLIB_SUPPORT)
     endif(ZLIB_FOUND)
 endif(ENABLE_ZLIB_SUPPORT)
 
-add_subdirectory(library)
 add_subdirectory(include)
+
+add_subdirectory(3rdparty)
+include_directories(${thirdparty_inc})
+list(APPEND libs ${thirdparty_lib})
+add_definitions(${thirdparty_def})
+
+add_subdirectory(library)
 
 if(ENABLE_PROGRAMS)
     add_subdirectory(programs)
@@ -223,13 +240,13 @@ if(ENABLE_TESTING)
             COMMAND mv DartConfiguration.tcl.bak DartConfiguration.tcl
         )
     endif(UNIX)
-endif()
 
-# Make scripts needed for testing available in an out-of-source build.
-if (NOT ${CMAKE_CURRENT_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
-    link_to_source(scripts)
-    # Copy (don't link) DartConfiguration.tcl, needed for memcheck, to
-    # keep things simple with the sed commands in the memcheck target.
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/DartConfiguration.tcl
-                   ${CMAKE_CURRENT_BINARY_DIR}/DartConfiguration.tcl COPYONLY)
+    # Make scripts needed for testing available in an out-of-source build.
+    if (NOT ${CMAKE_CURRENT_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+        link_to_source(scripts)
+        # Copy (don't link) DartConfiguration.tcl, needed for memcheck, to
+        # keep things simple with the sed commands in the memcheck target.
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/DartConfiguration.tcl
+                    ${CMAKE_CURRENT_BINARY_DIR}/DartConfiguration.tcl COPYONLY)
+    endif()
 endif()

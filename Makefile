@@ -1,4 +1,3 @@
-
 DESTDIR=/usr/local
 PREFIX=mbedtls_
 
@@ -75,11 +74,11 @@ post_build:
 ifndef WINDOWS
 
 	# If 128-bit keys are configured for CTR_DRBG, display an appropriate warning
-	-scripts/config.pl get MBEDTLS_CTR_DRBG_USE_128_BIT_KEY && ([ $$? -eq 0 ]) && \
+	-scripts/config.py get MBEDTLS_CTR_DRBG_USE_128_BIT_KEY && ([ $$? -eq 0 ]) && \
 	    echo '$(CTR_DRBG_128_BIT_KEY_WARNING)'
 
 	# If NULL Entropy is configured, display an appropriate warning
-	-scripts/config.pl get MBEDTLS_TEST_NULL_ENTROPY && ([ $$? -eq 0 ]) && \
+	-scripts/config.py get MBEDTLS_TEST_NULL_ENTROPY && ([ $$? -eq 0 ]) && \
 	    echo '$(NULL_ENTROPY_WARNING)'
 endif
 
@@ -122,3 +121,12 @@ apidoc:
 apidoc_clean:
 	rm -rf apidoc
 endif
+
+## Editor navigation files
+C_SOURCE_FILES = $(wildcard include/*/*.h library/*.[hc] programs/*/*.[hc] tests/suites/*.function)
+tags: $(C_SOURCE_FILES)
+	ctags -o $@ $(C_SOURCE_FILES)
+TAGS: $(C_SOURCE_FILES)
+	etags -o $@ $(C_SOURCE_FILES)
+GPATH GRTAGS GSYMS GTAGS: $(C_SOURCE_FILES)
+	ls $(C_SOURCE_FILES) | gtags -f - --gtagsconf .globalrc

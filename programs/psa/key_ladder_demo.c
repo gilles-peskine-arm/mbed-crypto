@@ -57,21 +57,13 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
-#if defined(MBEDTLS_PLATFORM_C)
-#include "mbedtls/platform.h"
-#else
 #include <stdlib.h>
-#define MBEDTLS_EXIT_SUCCESS EXIT_SUCCESS
-#define MBEDTLS_EXIT_FAILURE EXIT_FAILURE
-#define mbedtls_calloc       calloc
-#define mbedtls_free         free
-#define mbedtls_printf       printf
-#define mbedtls_exit         exit
-#endif
 #include <stdio.h>
 #include <string.h>
 
 #include "mbedtls/platform_util.h" // for mbedtls_platform_zeroize
+
+#include <psa/crypto.h>
 
 /* If the build options we need are not enabled, compile a placeholder. */
 #if !defined(MBEDTLS_SHA256_C) || !defined(MBEDTLS_MD_C) ||     \
@@ -79,18 +71,15 @@
     !defined(MBEDTLS_PSA_CRYPTO_C) || !defined(MBEDTLS_FS_IO)
 int main( void )
 {
-    mbedtls_printf("MBEDTLS_SHA256_C and/or MBEDTLS_MD_C and/or "
-                   "MBEDTLS_AES_C and/or MBEDTLS_CCM_C and/or "
-                   "MBEDTLS_PSA_CRYPTO_C and/or MBEDTLS_FS_IO not defined.\n");
+    printf("MBEDTLS_SHA256_C and/or MBEDTLS_MD_C and/or "
+           "MBEDTLS_AES_C and/or MBEDTLS_CCM_C and/or "
+           "MBEDTLS_PSA_CRYPTO_C and/or MBEDTLS_FS_IO "
+           "not defined.\n");
     return( 0 );
 }
 #else
 
 /* The real program starts here. */
-
-
-
-#include <psa/crypto.h>
 
 /* Run a system function and bail out if it fails. */
 #define SYS_CHECK( expr )                                       \
@@ -112,10 +101,10 @@ int main( void )
         status = ( expr );                                      \
         if( status != PSA_SUCCESS )                             \
         {                                                       \
-            mbedtls_printf( "Error %d at line %u: %s\n",        \
-                            (int) status,                       \
-                            __LINE__,                           \
-                            #expr );                            \
+            printf( "Error %d at line %u: %s\n",                \
+                    (int) status,                               \
+                    __LINE__,                                   \
+                    #expr );                                    \
             goto exit;                                          \
         }                                                       \
     }                                                           \
@@ -210,18 +199,15 @@ static psa_status_t generate( const char *key_file_name )
 {
     psa_status_t status = PSA_SUCCESS;
     psa_key_handle_t key_handle = 0;
-    psa_key_policy_t policy = PSA_KEY_POLICY_INIT;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
 
-    PSA_CHECK( psa_allocate_key( &key_handle ) );
-    psa_key_policy_set_usage( &policy,
-                              PSA_KEY_USAGE_DERIVE | PSA_KEY_USAGE_EXPORT,
-                              KDF_ALG );
-    PSA_CHECK( psa_set_key_policy( key_handle, &policy ) );
+    psa_set_key_usage_flags( &attributes,
+                             PSA_KEY_USAGE_DERIVE | PSA_KEY_USAGE_EXPORT );
+    psa_set_key_algorithm( &attributes, KDF_ALG );
+    psa_set_key_type( &attributes, PSA_KEY_TYPE_DERIVE );
+    psa_set_key_bits( &attributes, PSA_BYTES_TO_BITS( KEY_SIZE_BYTES ) );
 
-    PSA_CHECK( psa_generate_key( key_handle,
-                                 PSA_KEY_TYPE_DERIVE,
-                                 PSA_BYTES_TO_BITS( KEY_SIZE_BYTES ),
-                                 NULL, 0 ) );
+    PSA_CHECK( psa_generate_key( &attributes, &key_handle ) );
 
     PSA_CHECK( save_key( key_handle, key_file_name ) );
 
@@ -241,7 +227,7 @@ static psa_status_t import_key_from_file( psa_key_usage_t usage,
                                           psa_key_handle_t *master_key_handle )
 {
     psa_status_t status = PSA_SUCCESS;
-    psa_key_policy_t policy = PSA_KEY_POLICY_INIT;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
     uint8_t key_data[KEY_SIZE_BYTES];
     size_t key_size;
     FILE *key_file = NULL;
@@ -254,27 +240,26 @@ static psa_status_t import_key_from_file( psa_key_usage_t usage,
                                    key_file ) ) != 0 );
     if( fread( &extra_byte, 1, 1, key_file ) != 0 )
     {
-        mbedtls_printf( "Key file too large (max: %u).\n",
-                        (unsigned) sizeof( key_data ) );
+        printf( "Key file too large (max: %u).\n",
+                (unsigned) sizeof( key_data ) );
         status = DEMO_ERROR;
         goto exit;
     }
     SYS_CHECK( fclose( key_file ) == 0 );
     key_file = NULL;
 
-    PSA_CHECK( psa_allocate_key( master_key_handle ) );
-    psa_key_policy_set_usage( &policy, usage, alg );
-    PSA_CHECK( psa_set_key_policy( *master_key_handle, &policy ) );
-    PSA_CHECK( psa_import_key( *master_key_handle,
-                               PSA_KEY_TYPE_DERIVE,
-                               key_data, key_size ) );
+    psa_set_key_usage_flags( &attributes, usage );
+    psa_set_key_algorithm( &attributes, alg );
+    psa_set_key_type( &attributes, PSA_KEY_TYPE_DERIVE );
+    PSA_CHECK( psa_import_key( &attributes, key_data, key_size,
+                               master_key_handle ) );
 exit:
     if( key_file != NULL )
         fclose( key_file );
     mbedtls_platform_zeroize( key_data, sizeof( key_data ) );
     if( status != PSA_SUCCESS )
     {
-        /* If psa_allocate_key hasn't been called yet or has failed,
+        /* If the key creation hasn't happened yet or has failed,
          * *master_key_handle is 0. psa_destroy_key(0) is guaranteed to do
          * nothing and return PSA_ERROR_INVALID_HANDLE. */
         (void) psa_destroy_key( *master_key_handle );
@@ -292,43 +277,43 @@ static psa_status_t derive_key_ladder( const char *ladder[],
                                        psa_key_handle_t *key_handle )
 {
     psa_status_t status = PSA_SUCCESS;
-    psa_key_policy_t policy = PSA_KEY_POLICY_INIT;
-    psa_crypto_generator_t generator = PSA_CRYPTO_GENERATOR_INIT;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_derivation_operation_t operation = PSA_KEY_DERIVATION_OPERATION_INIT;
     size_t i;
-    psa_key_policy_set_usage( &policy,
-                              PSA_KEY_USAGE_DERIVE | PSA_KEY_USAGE_EXPORT,
-                              KDF_ALG );
+
+    psa_set_key_usage_flags( &attributes,
+                             PSA_KEY_USAGE_DERIVE | PSA_KEY_USAGE_EXPORT );
+    psa_set_key_algorithm( &attributes, KDF_ALG );
+    psa_set_key_type( &attributes, PSA_KEY_TYPE_DERIVE );
+    psa_set_key_bits( &attributes, PSA_BYTES_TO_BITS( KEY_SIZE_BYTES ) );
 
     /* For each label in turn, ... */
     for( i = 0; i < ladder_depth; i++ )
     {
         /* Start deriving material from the master key (if i=0) or from
          * the current intermediate key (if i>0). */
-        PSA_CHECK( psa_key_derivation(
-                       &generator,
-                       *key_handle,
-                       KDF_ALG,
-                       DERIVE_KEY_SALT, DERIVE_KEY_SALT_LENGTH,
-                       (uint8_t*) ladder[i], strlen( ladder[i] ),
-                       KEY_SIZE_BYTES ) );
+        PSA_CHECK( psa_key_derivation_setup( &operation, KDF_ALG ) );
+        PSA_CHECK( psa_key_derivation_input_bytes(
+                       &operation, PSA_KEY_DERIVATION_INPUT_SALT,
+                       DERIVE_KEY_SALT, DERIVE_KEY_SALT_LENGTH ) );
+        PSA_CHECK( psa_key_derivation_input_key(
+                       &operation, PSA_KEY_DERIVATION_INPUT_SECRET,
+                       *key_handle ) );
+        PSA_CHECK( psa_key_derivation_input_bytes(
+                       &operation, PSA_KEY_DERIVATION_INPUT_INFO,
+                       (uint8_t*) ladder[i], strlen( ladder[i] ) ) );
         /* When the parent key is not the master key, destroy it,
          * since it is no longer needed. */
         PSA_CHECK( psa_close_key( *key_handle ) );
         *key_handle = 0;
-        PSA_CHECK( psa_allocate_key( key_handle ) );
-        PSA_CHECK( psa_set_key_policy( *key_handle, &policy ) );
-        /* Use the generator obtained from the parent key to create
-         * the next intermediate key. */
-        PSA_CHECK( psa_generator_import_key(
-                       *key_handle,
-                       PSA_KEY_TYPE_DERIVE,
-                       PSA_BYTES_TO_BITS( KEY_SIZE_BYTES ),
-                       &generator ) );
-        PSA_CHECK( psa_generator_abort( &generator ) );
+        /* Derive the next intermediate key from the parent key. */
+        PSA_CHECK( psa_key_derivation_output_key( &attributes, &operation,
+                                                  key_handle ) );
+        PSA_CHECK( psa_key_derivation_abort( &operation ) );
     }
 
 exit:
-    psa_generator_abort( &generator );
+    psa_key_derivation_abort( &operation );
     if( status != PSA_SUCCESS )
     {
         psa_close_key( *key_handle );
@@ -343,34 +328,34 @@ static psa_status_t derive_wrapping_key( psa_key_usage_t usage,
                                          psa_key_handle_t *wrapping_key_handle )
 {
     psa_status_t status = PSA_SUCCESS;
-    psa_key_policy_t policy = PSA_KEY_POLICY_INIT;
-    psa_crypto_generator_t generator = PSA_CRYPTO_GENERATOR_INIT;
+    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+    psa_key_derivation_operation_t operation = PSA_KEY_DERIVATION_OPERATION_INIT;
 
     *wrapping_key_handle = 0;
-    PSA_CHECK( psa_allocate_key( wrapping_key_handle ) );
-    psa_key_policy_set_usage( &policy, usage, WRAPPING_ALG );
-    PSA_CHECK( psa_set_key_policy( *wrapping_key_handle, &policy ) );
 
-    PSA_CHECK( psa_key_derivation(
-                   &generator,
-                   derived_key_handle,
-                   KDF_ALG,
-                   WRAPPING_KEY_SALT, WRAPPING_KEY_SALT_LENGTH,
-                   NULL, 0,
-                   PSA_BITS_TO_BYTES( WRAPPING_KEY_BITS ) ) );
-    PSA_CHECK( psa_generator_import_key(
-                   *wrapping_key_handle,
-                   PSA_KEY_TYPE_AES,
-                   WRAPPING_KEY_BITS,
-                   &generator ) );
+    /* Set up a key derivation operation from the key derived from
+     * the master key. */
+    PSA_CHECK( psa_key_derivation_setup( &operation, KDF_ALG ) );
+    PSA_CHECK( psa_key_derivation_input_bytes(
+                   &operation, PSA_KEY_DERIVATION_INPUT_SALT,
+                   WRAPPING_KEY_SALT, WRAPPING_KEY_SALT_LENGTH ) );
+    PSA_CHECK( psa_key_derivation_input_key(
+                   &operation, PSA_KEY_DERIVATION_INPUT_SECRET,
+                   derived_key_handle ) );
+    PSA_CHECK( psa_key_derivation_input_bytes(
+                   &operation, PSA_KEY_DERIVATION_INPUT_INFO,
+                   NULL, 0 ) );
+
+    /* Create the wrapping key. */
+    psa_set_key_usage_flags( &attributes, usage );
+    psa_set_key_algorithm( &attributes, WRAPPING_ALG );
+    psa_set_key_type( &attributes, PSA_KEY_TYPE_AES );
+    psa_set_key_bits( &attributes, WRAPPING_KEY_BITS );
+    PSA_CHECK( psa_key_derivation_output_key( &attributes, &operation,
+                                              wrapping_key_handle ) );
 
 exit:
-    psa_generator_abort( &generator );
-    if( status != PSA_SUCCESS )
-    {
-        psa_close_key( *wrapping_key_handle );
-        *wrapping_key_handle = 0;
-    }
+    psa_key_derivation_abort( &operation );
     return( status );
 }
 
@@ -395,7 +380,7 @@ static psa_status_t wrap_data( const char *input_file_name,
 #if LONG_MAX > SIZE_MAX
     if( input_position > SIZE_MAX )
     {
-        mbedtls_printf( "Input file too large.\n" );
+        printf( "Input file too large.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
@@ -405,14 +390,14 @@ static psa_status_t wrap_data( const char *input_file_name,
     /* Check for integer overflow. */
     if( buffer_size < input_size )
     {
-        mbedtls_printf( "Input file too large.\n" );
+        printf( "Input file too large.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
 
     /* Load the data to wrap. */
     SYS_CHECK( fseek( input_file, 0, SEEK_SET ) == 0 );
-    SYS_CHECK( ( buffer = mbedtls_calloc( 1, buffer_size ) ) != NULL );
+    SYS_CHECK( ( buffer = calloc( 1, buffer_size ) ) != NULL );
     SYS_CHECK( fread( buffer, 1, input_size, input_file ) == input_size );
     SYS_CHECK( fclose( input_file ) == 0 );
     input_file = NULL;
@@ -447,7 +432,7 @@ exit:
         fclose( output_file );
     if( buffer != NULL )
         mbedtls_platform_zeroize( buffer, buffer_size );
-    mbedtls_free( buffer );
+    free( buffer );
     return( status );
 }
 
@@ -471,13 +456,13 @@ static psa_status_t unwrap_data( const char *input_file_name,
     if( memcmp( &header.magic, WRAPPED_DATA_MAGIC,
                 WRAPPED_DATA_MAGIC_LENGTH ) != 0 )
     {
-        mbedtls_printf( "The input does not start with a valid magic header.\n" );
+        printf( "The input does not start with a valid magic header.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
     if( header.ad_size != sizeof( header ) )
     {
-        mbedtls_printf( "The header size is not correct.\n" );
+        printf( "The header size is not correct.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
@@ -486,18 +471,18 @@ static psa_status_t unwrap_data( const char *input_file_name,
     /* Check for integer overflow. */
     if( ciphertext_size < header.payload_size )
     {
-        mbedtls_printf( "Input file too large.\n" );
+        printf( "Input file too large.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
 
     /* Load the payload data. */
-    SYS_CHECK( ( buffer = mbedtls_calloc( 1, ciphertext_size ) ) != NULL );
+    SYS_CHECK( ( buffer = calloc( 1, ciphertext_size ) ) != NULL );
     SYS_CHECK( fread( buffer, 1, ciphertext_size,
                       input_file ) == ciphertext_size );
     if( fread( &extra_byte, 1, 1, input_file ) != 0 )
     {
-        mbedtls_printf( "Extra garbage after ciphertext\n" );
+        printf( "Extra garbage after ciphertext\n" );
         status = DEMO_ERROR;
         goto exit;
     }
@@ -513,7 +498,7 @@ static psa_status_t unwrap_data( const char *input_file_name,
                                  &plaintext_size ) );
     if( plaintext_size != header.payload_size )
     {
-        mbedtls_printf( "Incorrect payload size in the header.\n" );
+        printf( "Incorrect payload size in the header.\n" );
         status = DEMO_ERROR;
         goto exit;
     }
@@ -532,7 +517,7 @@ exit:
         fclose( output_file );
     if( buffer != NULL )
         mbedtls_platform_zeroize( buffer, ciphertext_size );
-    mbedtls_free( buffer );
+    free( buffer );
     return( status );
 }
 
@@ -600,23 +585,23 @@ exit:
 
 static void usage( void )
 {
-    mbedtls_printf( "Usage: key_ladder_demo MODE [OPTION=VALUE]...\n" );
-    mbedtls_printf( "Demonstrate the usage of a key derivation ladder.\n" );
-    mbedtls_printf( "\n" );
-    mbedtls_printf( "Modes:\n" );
-    mbedtls_printf( "  generate  Generate the master key\n" );
-    mbedtls_printf( "  save      Save the derived key\n" );
-    mbedtls_printf( "  unwrap    Unwrap (decrypt) input with the derived key\n" );
-    mbedtls_printf( "  wrap      Wrap (encrypt) input with the derived key\n" );
-    mbedtls_printf( "\n" );
-    mbedtls_printf( "Options:\n" );
-    mbedtls_printf( "  input=FILENAME    Input file (required for wrap/unwrap)\n" );
-    mbedtls_printf( "  master=FILENAME   File containing the master key (default: master.key)\n" );
-    mbedtls_printf( "  output=FILENAME   Output file (required for save/wrap/unwrap)\n" );
-    mbedtls_printf( "  label=TEXT        Label for the key derivation.\n" );
-    mbedtls_printf( "                    This may be repeated multiple times.\n" );
-    mbedtls_printf( "                    To get the same key, you must use the same master key\n" );
-    mbedtls_printf( "                    and the same sequence of labels.\n" );
+    printf( "Usage: key_ladder_demo MODE [OPTION=VALUE]...\n" );
+    printf( "Demonstrate the usage of a key derivation ladder.\n" );
+    printf( "\n" );
+    printf( "Modes:\n" );
+    printf( "  generate  Generate the master key\n" );
+    printf( "  save      Save the derived key\n" );
+    printf( "  unwrap    Unwrap (decrypt) input with the derived key\n" );
+    printf( "  wrap      Wrap (encrypt) input with the derived key\n" );
+    printf( "\n" );
+    printf( "Options:\n" );
+    printf( "  input=FILENAME    Input file (required for wrap/unwrap)\n" );
+    printf( "  master=FILENAME   File containing the master key (default: master.key)\n" );
+    printf( "  output=FILENAME   Output file (required for save/wrap/unwrap)\n" );
+    printf( "  label=TEXT        Label for the key derivation.\n" );
+    printf( "                    This may be repeated multiple times.\n" );
+    printf( "                    To get the same key, you must use the same master key\n" );
+    printf( "                    and the same sequence of labels.\n" );
 }
 
 #if defined(MBEDTLS_CHECK_PARAMS)
@@ -625,9 +610,9 @@ void mbedtls_param_failed( const char *failure_condition,
                            const char *file,
                            int line )
 {
-    mbedtls_printf( "%s:%i: Input param failed - %s\n",
+    printf( "%s:%i: Input param failed - %s\n",
                     file, line, failure_condition );
-    mbedtls_exit( MBEDTLS_EXIT_FAILURE );
+    exit( EXIT_FAILURE );
 }
 #endif
 
@@ -648,7 +633,7 @@ int main( int argc, char *argv[] )
         strcmp( argv[1], "--help" ) == 0 )
     {
         usage( );
-        return( MBEDTLS_EXIT_SUCCESS );
+        return( EXIT_SUCCESS );
     }
 
     for( i = 2; i < argc; i++ )
@@ -656,7 +641,7 @@ int main( int argc, char *argv[] )
         char *q = strchr( argv[i], '=' );
         if( q == NULL )
         {
-            mbedtls_printf( "Missing argument to option %s\n", argv[i] );
+            printf( "Missing argument to option %s\n", argv[i] );
             goto usage_failure;
         }
         *q = 0;
@@ -667,9 +652,9 @@ int main( int argc, char *argv[] )
         {
             if( ladder_depth == MAX_LADDER_DEPTH )
             {
-                mbedtls_printf( "Maximum ladder depth %u exceeded.\n",
+                printf( "Maximum ladder depth %u exceeded.\n",
                                 (unsigned) MAX_LADDER_DEPTH );
-                return( MBEDTLS_EXIT_FAILURE );
+                return( EXIT_FAILURE );
             }
             ladder[ladder_depth] = q;
             ++ladder_depth;
@@ -680,7 +665,7 @@ int main( int argc, char *argv[] )
             output_file_name = q;
         else
         {
-            mbedtls_printf( "Unknown option: %s\n", argv[i] );
+            printf( "Unknown option: %s\n", argv[i] );
             goto usage_failure;
         }
     }
@@ -695,20 +680,20 @@ int main( int argc, char *argv[] )
         mode = MODE_WRAP;
     else
     {
-        mbedtls_printf( "Unknown action: %s\n", argv[1] );
+        printf( "Unknown action: %s\n", argv[1] );
         goto usage_failure;
     }
 
     if( input_file_name == NULL &&
         ( mode == MODE_WRAP || mode == MODE_UNWRAP ) )
     {
-        mbedtls_printf( "Required argument missing: input\n" );
+        printf( "Required argument missing: input\n" );
         return( DEMO_ERROR );
     }
     if( output_file_name == NULL &&
         ( mode == MODE_SAVE || mode == MODE_WRAP || mode == MODE_UNWRAP ) )
     {
-        mbedtls_printf( "Required argument missing: output\n" );
+        printf( "Required argument missing: output\n" );
         return( DEMO_ERROR );
     }
 
@@ -716,11 +701,11 @@ int main( int argc, char *argv[] )
                   ladder, ladder_depth,
                   input_file_name, output_file_name );
     return( status == PSA_SUCCESS ?
-            MBEDTLS_EXIT_SUCCESS :
-            MBEDTLS_EXIT_FAILURE );
+            EXIT_SUCCESS :
+            EXIT_FAILURE );
 
 usage_failure:
     usage( );
-    return( MBEDTLS_EXIT_FAILURE );
+    return( EXIT_FAILURE );
 }
 #endif /* MBEDTLS_SHA256_C && MBEDTLS_MD_C && MBEDTLS_AES_C && MBEDTLS_CCM_C && MBEDTLS_PSA_CRYPTO_C && MBEDTLS_FS_IO */

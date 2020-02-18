@@ -45,7 +45,7 @@
 #endif
 
 /* Fix the config here. Not convenient to put an #ifdef _WIN32 in config.h as
- * it would confuse config.pl. */
+ * it would confuse config.py. */
 #if !defined(MBEDTLS_PLATFORM_SNPRINTF_ALT) && \
     !defined(MBEDTLS_PLATFORM_SNPRINTF_MACRO)
 #define MBEDTLS_PLATFORM_SNPRINTF_ALT
@@ -125,11 +125,21 @@
 #error "MBEDTLS_ECP_RESTARTABLE defined, but it cannot coexist with an alternative or PSA-based ECP implementation"
 #endif
 
+#if defined(MBEDTLS_ECP_RESTARTABLE)           && \
+    ! defined(MBEDTLS_ECDH_LEGACY_CONTEXT)
+#error "MBEDTLS_ECP_RESTARTABLE defined, but not MBEDTLS_ECDH_LEGACY_CONTEXT"
+#endif
+
+#if defined(MBEDTLS_ECDH_VARIANT_EVEREST_ENABLED)           && \
+    defined(MBEDTLS_ECDH_LEGACY_CONTEXT)
+#error "MBEDTLS_ECDH_VARIANT_EVEREST_ENABLED defined, but MBEDTLS_ECDH_LEGACY_CONTEXT not disabled"
+#endif
+
 #if defined(MBEDTLS_ECDSA_DETERMINISTIC) && !defined(MBEDTLS_HMAC_DRBG_C)
 #error "MBEDTLS_ECDSA_DETERMINISTIC defined, but not all prerequisites"
 #endif
 
-#if defined(MBEDTLS_ECP_C) && ( !defined(MBEDTLS_BIGNUM_C) || (   \
+#if defined(MBEDTLS_ECP_C) && ( !defined(MBEDTLS_BIGNUM_C) || (    \
     !defined(MBEDTLS_ECP_DP_SECP192R1_ENABLED) &&                  \
     !defined(MBEDTLS_ECP_DP_SECP224R1_ENABLED) &&                  \
     !defined(MBEDTLS_ECP_DP_SECP256R1_ENABLED) &&                  \
@@ -140,7 +150,9 @@
     !defined(MBEDTLS_ECP_DP_BP512R1_ENABLED)   &&                  \
     !defined(MBEDTLS_ECP_DP_SECP192K1_ENABLED) &&                  \
     !defined(MBEDTLS_ECP_DP_SECP224K1_ENABLED) &&                  \
-    !defined(MBEDTLS_ECP_DP_SECP256K1_ENABLED) ) )
+    !defined(MBEDTLS_ECP_DP_SECP256K1_ENABLED) &&                  \
+    !defined(MBEDTLS_ECP_DP_CURVE25519_ENABLED) &&                 \
+    !defined(MBEDTLS_ECP_DP_CURVE448_ENABLED) ) )
 #error "MBEDTLS_ECP_C defined, but not all prerequisites"
 #endif
 
@@ -177,7 +189,7 @@
 #endif
 
 #if defined(MBEDTLS_GCM_C) && (                                        \
-        !defined(MBEDTLS_AES_C) && !defined(MBEDTLS_CAMELLIA_C) )
+        !defined(MBEDTLS_AES_C) && !defined(MBEDTLS_CAMELLIA_C) && !defined(MBEDTLS_ARIA_C) )
 #error "MBEDTLS_GCM_C defined, but not all prerequisites"
 #endif
 
@@ -291,6 +303,14 @@
 #if defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C) &&                          \
     ( !defined(MBEDTLS_PLATFORM_C) || !defined(MBEDTLS_PLATFORM_MEMORY) )
 #error "MBEDTLS_MEMORY_BUFFER_ALLOC_C defined, but not all prerequisites"
+#endif
+
+#if defined(MBEDTLS_MEMORY_BACKTRACE) && !defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
+#error "MBEDTLS_MEMORY_BACKTRACE defined, but not all prerequesites"
+#endif
+
+#if defined(MBEDTLS_MEMORY_DEBUG) && !defined(MBEDTLS_MEMORY_BUFFER_ALLOC_C)
+#error "MBEDTLS_MEMORY_DEBUG defined, but not all prerequesites"
 #endif
 
 #if defined(MBEDTLS_PADLOCK_C) && !defined(MBEDTLS_HAVE_ASM)
@@ -525,26 +545,31 @@
 #error "MBEDTLS_PSA_CRYPTO_SPM defined, but not all prerequisites"
 #endif
 
-#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_FILE_C) && defined(MBEDTLS_PSA_CRYPTO_STORAGE_ITS_C)
-#error "Only one of MBEDTLS_PSA_CRYPTO_STORAGE_FILE_C or MBEDTLS_PSA_CRYPTO_STORAGE_ITS_C can be defined"
+#if defined(MBEDTLS_PSA_CRYPTO_SE_C) &&    \
+    ! ( defined(MBEDTLS_PSA_CRYPTO_C) && \
+        defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) )
+#error "MBEDTLS_PSA_CRYPTO_SE_C defined, but not all prerequisites"
 #endif
 
 #if defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) &&            \
-    !( defined(MBEDTLS_PSA_CRYPTO_C) &&                 \
-       ( defined(MBEDTLS_PSA_CRYPTO_STORAGE_FILE_C) ||  \
-         defined(MBEDTLS_PSA_CRYPTO_STORAGE_ITS_C) ) )
+    ! defined(MBEDTLS_PSA_CRYPTO_C)
 #error "MBEDTLS_PSA_CRYPTO_STORAGE_C defined, but not all prerequisites"
 #endif
 
-#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_FILE_C) &&            \
-    !( defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) &&           \
-       defined(MBEDTLS_FS_IO) )
-#error "MBEDTLS_PSA_CRYPTO_STORAGE_FILE_C defined, but not all prerequisites"
+#if defined(MBEDTLS_PSA_INJECT_ENTROPY) &&      \
+    !( defined(MBEDTLS_PSA_CRYPTO_STORAGE_C) && \
+       defined(MBEDTLS_ENTROPY_NV_SEED) )
+#error "MBEDTLS_PSA_INJECT_ENTROPY defined, but not all prerequisites"
 #endif
 
-#if defined(MBEDTLS_PSA_CRYPTO_STORAGE_ITS_C) &&             \
-    ! defined(MBEDTLS_PSA_CRYPTO_STORAGE_C)
-#error "MBEDTLS_PSA_CRYPTO_STORAGE_ITS_C defined, but not all prerequisites"
+#if defined(MBEDTLS_PSA_INJECT_ENTROPY) &&              \
+    !defined(MBEDTLS_NO_DEFAULT_ENTROPY_SOURCES)
+#error "MBEDTLS_PSA_INJECT_ENTROPY is not compatible with actual entropy sources"
+#endif
+
+#if defined(MBEDTLS_PSA_ITS_FILE_C) && \
+    !defined(MBEDTLS_FS_IO)
+#error "MBEDTLS_PSA_ITS_FILE_C defined, but not all prerequisites"
 #endif
 
 #if defined(MBEDTLS_RSA_C) && ( !defined(MBEDTLS_BIGNUM_C) ||         \
@@ -560,6 +585,10 @@
 #if defined(MBEDTLS_X509_RSASSA_PSS_SUPPORT) &&                        \
     ( !defined(MBEDTLS_RSA_C) || !defined(MBEDTLS_PKCS1_V21) )
 #error "MBEDTLS_X509_RSASSA_PSS_SUPPORT defined, but not all prerequisites"
+#endif
+
+#if defined(MBEDTLS_SHA512_NO_SHA384) && !defined(MBEDTLS_SHA512_C)
+#error "MBEDTLS_SHA512_NO_SHA384 defined without MBEDTLS_SHA512_C"
 #endif
 
 #if defined(MBEDTLS_SSL_PROTO_SSL3) && ( !defined(MBEDTLS_MD5_C) ||     \

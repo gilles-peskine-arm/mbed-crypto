@@ -1,7 +1,7 @@
 /**
  * \file psa/crypto_platform.h
  *
- * \brief PSA cryptography module: Mbed TLS platfom definitions
+ * \brief PSA cryptography module: Mbed TLS platform definitions
  *
  * \note This file may not be included directly. Applications must
  * include psa/crypto.h.
@@ -38,7 +38,7 @@
 /* Include the Mbed TLS configuration file, the way Mbed TLS does it
  * in each of its header files. */
 #if !defined(MBEDTLS_CONFIG_FILE)
-#include "../mbedtls/config.h"
+#include "mbedtls/config.h"
 #else
 #include MBEDTLS_CONFIG_FILE
 #endif
@@ -89,6 +89,7 @@ typedef struct
  * `psa_key_file_id_t` argument. As a workaround, make `psa_key_id_t` an
  * alias for `psa_key_file_id_t` when building for a multi-client service. */
 typedef psa_key_file_id_t psa_key_id_t;
+#define PSA_KEY_ID_INIT {0, 0}
 
 #else /* !MBEDTLS_PSA_CRYPTO_KEY_FILE_ID_ENCODES_OWNER */
 
