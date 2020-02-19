@@ -107,7 +107,7 @@ sub gen_app_guid {
 }
 
 sub gen_app {
-    my ($path, $template, $dir, $ext) = @_;
+    my ($header_dirs, $path, $template, $dir, $ext) = @_;
 
     my $guid = gen_app_guid( $path );
     $path =~ s!/!\\!g;
@@ -119,10 +119,13 @@ sub gen_app {
         $srcs .= "\n    <ClCompile Include=\"..\\..\\programs\\test\\query_config.c\" \/>\r";
     }
 
+    my $include_directories = join( ';', @$header_dirs );
+
     my $content = $template;
     $content =~ s/<SOURCES>/$srcs/g;
     $content =~ s/<APPNAME>/$appname/g;
     $content =~ s/<GUID>/$guid/g;
+    $content =~ s/INCLUDE_DIRECTORIES\r\n/$include_directories\r\n/m;
 
     content_to_file( $content, "$dir/$appname.$ext" );
 }
@@ -135,12 +138,12 @@ sub get_app_list {
 }
 
 sub gen_app_files {
-    my @app_list = @_;
+    my ($header_dirs, @app_list) = @_;
 
     my $vsx_tpl = slurp_file( $vsx_app_tpl_file );
 
     for my $app ( @app_list ) {
-        gen_app( $app, $vsx_tpl, $vsx_dir, $vsx_ext );
+        gen_app( $header_dirs, $app, $vsx_tpl, $vsx_dir, $vsx_ext );
     }
 }
 
@@ -157,16 +160,18 @@ sub gen_entry_list {
 }
 
 sub gen_main_file {
-    my ($headers, $sources,
+    my ($header_dirs, $headers, $sources,
         $hdr_tpl, $src_tpl,
         $main_tpl, $main_out) = @_;
 
     my $header_entries = gen_entry_list( $hdr_tpl, @$headers );
     my $source_entries = gen_entry_list( $src_tpl, @$sources );
+    my $include_directories = join( ';', @$header_dirs );
 
     my $out = slurp_file( $main_tpl );
     $out =~ s/SOURCE_ENTRIES\r\n/$source_entries/m;
     $out =~ s/HEADER_ENTRIES\r\n/$header_entries/m;
+    $out =~ s/INCLUDE_DIRECTORIES\r\n/$include_directories\r\n/m;
 
     content_to_file( $out, $main_out );
 }
@@ -215,24 +220,27 @@ sub main {
     del_vsx_files();
 
     my @app_list = get_app_list();
-    my @headers = (
-                   <$mbedtls_header_dir/*.h>,
-                   <$psa_header_dir/*.h>,
-                   <$source_dir/*.h>,
-                   (map { <$_/*.h> } @thirdparty_header_dirs),
-                  );
-    my @sources = (
-                   <$source_dir/*.c>,
-                   (map { <$_/*.c> } @thirdparty_source_dirs),
-                  );
+    my @header_dirs = (
+                       $mbedtls_header_dir,
+                       $psa_header_dir,
+                       $source_dir,
+                       @thirdparty_header_dirs,
+                      );
+    my @headers = (map { <$_/*.h> } @header_dirs);
+    my @source_dirs = (
+                       $source_dir,
+                       @thirdparty_source_dirs,
+                      );
+    my @sources = (map { <$_/*.c> } @source_dirs);
+
     @headers = grep { ! $excluded_files{$_} } @headers;
     @sources = grep { ! $excluded_files{$_} } @sources;
     map { s!/!\\!g } @headers;
     map { s!/!\\!g } @sources;
 
-    gen_app_files( @app_list );
+    gen_app_files( \@header_dirs, @app_list );
 
-    gen_main_file( \@headers, \@sources,
+    gen_main_file( \@header_dirs, \@headers, \@sources,
                    $vsx_hdr_tpl, $vsx_src_tpl,
                    $vsx_main_tpl_file, $vsx_main_file );
 
